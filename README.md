@@ -4,24 +4,16 @@
 - index.html：页面骨架（保持原设计不变）
 - assets/styles.css：样式（从原 HTML 拆出）
 - assets/app.js：渲染逻辑（从原 HTML 拆出）
-- data/robots.json：机器人清单数据（你主要修改这个文件）
+- server.js : 后端服务
+- data/robots.json：机器人配置文件
 
-## 如何打开
-> 注意：浏览器在 `file://` 方式打开时，`fetch('./data/robots.json')` 往往会被跨域策略拦截。  
-> 请用本地静态服务器打开。
 
-### 方式 A（推荐）：Python 一行启动
-在该目录上一层执行：
+
+### 启动服务：Python 一行启动，默认端口8000
+在该目录执行：
 ```bash
-python -m http.server 8000
-```
-
-然后浏览器访问：
-- http://localhost:8000/robot_console_dashboard_modular/index.html
-
-### 方式 B：Node
-```bash
-npx http-server -p 8000
+npm i express mqtt
+node server.js 
 ```
 
 ## 如何修改表项内容（数据）
