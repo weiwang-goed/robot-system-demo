@@ -3,6 +3,31 @@
 let robots = [];
 let selectedId = null;
 
+// Add: ensure showTab exists so index.html onclick won't throw
+window.showTab = function (tabId) {
+  const taskEl = document.getElementById("task-center");
+  const statsEl = document.getElementById("stats");
+  const filtersEl = document.querySelector(".filters");
+  const contentEl = document.querySelector(".content");
+
+  if (tabId === "task-center") {
+    if (taskEl) taskEl.style.display = "block";
+    if (statsEl) statsEl.style.display = "none";
+    if (filtersEl) filtersEl.style.display = "none";
+    if (contentEl) contentEl.style.display = "none";
+    // If task-center renderer is available, call it
+    if (typeof window.renderTaskCenter === "function") {
+      try { window.renderTaskCenter(); } catch (e) { console.error("renderTaskCenter error:", e); }
+    }
+  } else {
+    // show main dashboard
+    if (taskEl) taskEl.style.display = "none";
+    if (statsEl) statsEl.style.display = "";
+    if (filtersEl) filtersEl.style.display = "";
+    if (contentEl) contentEl.style.display = "";
+  }
+}
+
 function statusMeta(s) {
   if (s === "ONLINE") return { cls: "s-online", text: "在线" };
   if (s === "OFFLINE") return { cls: "s-offline", text: "离线" };
@@ -97,12 +122,14 @@ function buildControlUrl(r) {
   if (r.controlUrl) 
     return `http://${r.ip}${r.controlUrl}`;
   else
-    return `http://${r.ip}`
+    return `http://${r.ip}`;
 }
 
 function openControl(id) {
   const r = robots.find((x) => x.id === id);
   const url = buildControlUrl(r);
+
+  console.log("open url: ", url);
   if (!url) {
     alert("该机器人未配置 IP（或 controlUrl）");
     return;

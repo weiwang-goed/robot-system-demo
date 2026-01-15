@@ -18,11 +18,11 @@
       </div>
 
       <nav class="nav">
-        <a class="active" href="#" onclick="return false;">
+        <a class="active" href="#" onclick="showTab('dashboard'); return false;">
           <span>驾驶舱</span>
           <span class="meta" id="navCount">—</span>
         </a>
-        <a href="#" onclick="return false;">
+        <a href="#" onclick="showTab('task-center'); return false;">
           <span>任务中心</span>
           <span class="meta">队列</span>
         </a>
@@ -69,6 +69,11 @@
           <button class="btn primary" onclick="alert('新增接入：可对接注册中心/资产台账/机器人网关')">新增接入</button>
         </div>
       </div>
+
+      <!-- TAB: 任务中心（默认隐藏，切换 showTab('task-center') 可显示） -->
+      <section id="task-center" style="display:none; padding:12px;">
+        <!-- task-center.js 将渲染到这里 -->
+      </section>
 
       <section class="grid" id="stats"></section>
 
@@ -176,5 +181,6 @@
   </div>
 
   <script src="./assets/app.js"></script>
-</body>
+  <script src="./assets/task-center.js"></script>
+ </body>
 </html>

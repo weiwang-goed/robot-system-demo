@@ -7,7 +7,7 @@
     "ip": "10.20.3.2",
     "status": "ONLINE",
     "battery": 86,
-    "site": "深圳 / 观澜仓库",
+    "site": "深圳观澜仓库",
     "task": "3号仓库日常盘点",
     "lastSeen": "12秒前",
     "firmware": "v2.7.3",
@@ -18,6 +18,7 @@
       "箱类堆垛"
     ],
     "notes": "试点运行中",
+    "controlUrl":"/api/control",
     "statusUrl": "/api/status"
   },
   {
@@ -69,7 +70,7 @@
     "ip": "10.20.3.5",
     "status": "CHARGING",
     "battery": 19,
-    "site": "鼎和大厦 / 22楼创新工作室",
+    "site": "鼎和大厦22楼",
     "task": "待命",
     "lastSeen": "3秒前",
     "firmware": "v2.6.8",

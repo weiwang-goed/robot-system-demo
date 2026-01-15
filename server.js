@@ -82,7 +82,7 @@ try {
   const roster = JSON.parse(rosterRaw);
   if (Array.isArray(roster)) {
     for (const r of roster) {
-      if (!r?.id) continue;
+      if (!r.id) continue;
       registerRobot(r.id, r);
       if (r.statusUrl) {
         console.log("statusUrl: " + `id : ${r.id}` +`http://${r.ip}${r.statusUrl}`);
@@ -285,4 +285,159 @@ app.listen(PORT, () => {
   console.log(`[http] listening http://localhost:${PORT}`);
   console.log(`[ui] open     http://localhost:${PORT}/index.html`);
   console.log(`[roster]      ${ROBOT_ROSTER_PATH}`);
+});
+
+// ------------- 新增：基于 OpenAI + OR-Tools 的 Planner 接入（minimal prototype） -------------
+const { spawnSync } = require("child_process");
+
+// openai client (npm i openai)
+let OpenAI;
+try {
+  OpenAI = require("openai");
+} catch (e) {
+  console.warn("openai npm client not found. install with: npm i openai");
+  OpenAI = null;
+}
+
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || null;
+const openaiClient = OPENAI_API_KEY && OpenAI ? new OpenAI.OpenAIApi(new OpenAI.Configuration({ apiKey: OPENAI_API_KEY })) : null;
+
+// 将自然语言 instruction 转成简单的 steps（用 LLM）
+async function llmExtractSteps(instruction, maxSteps = 8) {
+  // fallback simple heuristic if no LLM configured
+  if (!openaiClient) {
+    const kws = instruction.split(/[,;，。]/).filter(Boolean).slice(0, maxSteps);
+    return kws.map((k, i) => ({ id: `LLM-${i}`, action: k.trim(), estimatedDurationSec: 60 + (i * 30) }));
+  }
+
+  const prompt = [
+    "你是一个任务分解助理。将用户自然语言的任务指令分解为最多 8 个有序步骤（step），每个 step 提供：短动作描述(action)、估计耗时（秒，estimatedDurationSec）以及可选的 requiredCapabilities 列表（能力关键词）。",
+    "只返回 JSON 数组，不要额外解释。示例：[{\"action\":\"到A区拍照\",\"estimatedDurationSec\":60,\"requiredCapabilities\":[\"可见光\"]}, ...]",
+    `用户指令：${instruction}`
+  ].join("\n\n");
+
+  try {
+    const resp = await openaiClient.createChatCompletion({
+      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 800,
+      temperature: 0.2,
+    });
+    const txt = resp.data.choices?.[0]?.message?.content || resp.data.choices?.[0]?.text || "";
+    // 尝试解析 JSON
+    const jsonStart = txt.indexOf("[");
+    const jsonStr = jsonStart >= 0 ? txt.slice(jsonStart) : txt;
+    const parsed = JSON.parse(jsonStr);
+    // normalize
+    return parsed.slice(0, maxSteps).map((s, i) => ({
+      id: s.id || `LLM-${i}`,
+      action: s.action || s.name || `step-${i}`,
+      estimatedDurationSec: Number(s.estimatedDurationSec) || 60,
+      requiredCapabilities: Array.isArray(s.requiredCapabilities) ? s.requiredCapabilities : (s.capabilities || []),
+    }));
+  } catch (e) {
+    console.error("llmExtractSteps error:", e?.message || e);
+    // fallback heuristic
+    return [{ id: "LLM-FALLBACK-1", action: instruction.slice(0, 60), estimatedDurationSec: 90, requiredCapabilities: [] }];
+  }
+}
+
+// 替换 OR-Tools 调用：使用 LLM 生成 steps，然后用简单启发式调度（capability match + round-robin + greedy start times）
+function simpleSchedule(robots, steps) {
+  // robots: [{id, capabilities[], status, site, battery}], steps: [{id, action, estimatedDurationSec, requiredCapabilities[]}]
+  const avail = robots.filter(r => (r.status === "ONLINE" || r.status == null));
+  const planSteps = [];
+  if (steps.length === 0) return { steps: [] };
+
+  // prepare robot cumulative timeline (seconds)
+  const robotTime = {};
+  for (const r of avail) robotTime[r.id] = 0;
+
+  let rr = 0;
+  for (const s of steps) {
+    // find candidate robots that meet requiredCapabilities
+    const reqs = (s.requiredCapabilities || []).map(x => String(x || "").toLowerCase()).filter(Boolean);
+    let candidate = null;
+    if (reqs.length > 0) {
+      candidate = avail.find(r => {
+        const caps = (r.capabilities || []).map(c => String(c || "").toLowerCase());
+        return reqs.every(req => caps.some(c => c.includes(req)));
+      });
+    }
+    if (!candidate) {
+      // fallback: choose next robot by round-robin
+      if (avail.length > 0) candidate = avail[rr % avail.length];
+      rr++;
+    }
+
+    const assignedId = candidate ? candidate.id : null;
+    const startSec = assignedId ? robotTime[assignedId] : 0;
+    const dur = Number(s.estimatedDurationSec || 60);
+
+    // advance robot timeline if assigned
+    if (assignedId) robotTime[assignedId] = startSec + dur;
+
+    planSteps.push({
+      id: s.id || `STEP-${Math.random().toString(36).slice(2,8)}`,
+      action: s.action || "",
+      estimatedDurationSec: dur,
+      requiredCapabilities: s.requiredCapabilities || [],
+      assignedRobotId: assignedId,
+      startSec: startSec
+    });
+  }
+
+  return { steps: planSteps };
+}
+
+// POST /api/tasks: 使用 llmExtractSteps -> simpleSchedule -> 返回 plan（dryRun 支持）
+app.post("/api/tasks", async (req, res) => {
+  try {
+    const { instruction, site, dryRun } = req.body || {};
+    if (!instruction) return res.status(400).json({ error: "instruction required" });
+
+    // 收集候选机器人（最小描述）
+    const robots = [...robotMap.values()].map(r => ({
+      id: r.id,
+      capabilities: r.capabilities || [],
+      status: r.status,
+      site: r.site,
+      battery: r.battery
+    })).filter(Boolean);
+
+    const candidateRobots = site ? robots.filter(r => (r.site || "").toLowerCase().includes(String(site).toLowerCase())) : robots;
+
+    // 1) LLM -> steps（llmExtractSteps 应在文件中已定义）
+    const steps = await llmExtractSteps(instruction, 8);
+
+    // 2) 调度：简单启发式
+    const scheduled = simpleSchedule(candidateRobots, steps);
+
+    const plan = {
+      id: genId("PLAN"),
+      instruction,
+      site,
+      createdAt: Date.now(),
+      steps: scheduled.steps.map(s => ({
+        id: s.id,
+        action: s.action,
+        assignedRobotId: s.assignedRobotId || null,
+        estimatedDurationSec: s.estimatedDurationSec,
+        startSec: s.startSec || 0,
+        status: "PENDING"
+      }))
+    };
+
+    if (!dryRun) {
+      const taskId = genId("TASK");
+      const task = { id: taskId, instruction, site, createdAt: Date.now(), status: "PLANNED", plan };
+      tasks.set(taskId, task);
+      return res.json({ task, plan, dryRun: false });
+    } else {
+      return res.json({ task: null, plan, dryRun: true });
+    }
+  } catch (e) {
+    console.error("POST /api/tasks error:", e);
+    res.status(500).json({ error: e.message || String(e) });
+  }
 });
