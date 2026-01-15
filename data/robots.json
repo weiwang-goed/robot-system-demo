@@ -1,0 +1,84 @@
+[
+  {
+    "id": "WR-GYL-0001",
+    "name": "仓储管理机器人001",
+    "category": "轮式机器人",
+    "model": "AGIBOT-A2W",
+    "ip": "10.20.3.2",
+    "status": "ONLINE",
+    "battery": 86,
+    "site": "深圳 / 观澜仓库",
+    "task": "3号仓库日常盘点",
+    "lastSeen": "12秒前",
+    "firmware": "v2.7.3",
+    "sn": "SNXRP-23-8841",
+    "capabilities": [
+      "可见光",
+      "语音播报",
+      "箱类堆垛"
+    ],
+    "notes": "试点运行中",
+    "statusUrl": "/api/status"
+  },
+  {
+    "id": "QR-SZZX-0001",
+    "name": "电力巡检机器狗001",
+    "category": "四足机器人",
+    "model": "Go2-EDU",
+    "ip": "10.20.3.3",
+    "status": "ALARM",
+    "battery": 43,
+    "site": "鼎和大厦22楼",
+    "task": "定点巡检 / 孪生构建",
+    "lastSeen": "6秒前",
+    "firmware": "v1.9.0",
+    "sn": "SNGO2-19-2203",
+    "capabilities": [
+      "RGB-D可见光",
+      "语音对讲",
+      "夜视"
+    ],
+    "notes": "告警：避障异常（近3分钟 4次）; 网络连接异常（近60分钟 2次）"
+  },
+  {
+    "id": "DR-WX-0001",
+    "name": "电力巡线无人机001",
+    "category": "无人机",
+    "model": "Matrice 4T",
+    "ip": "10.20.3.4",
+    "status": "OFFLINE",
+    "battery": 0,
+    "site": "伟星变电站",
+    "task": "—",
+    "lastSeen": "18分钟前",
+    "firmware": "v3.2.1",
+    "sn": "3M4T4A9C0F2K7D81",
+    "capabilities": [
+      "4K云台",
+      "RTK",
+      "航线任务"
+    ],
+    "notes": "离线：疑似网络未连通",
+    "statusUrl": "/api/status"
+  },
+  {
+    "id": "WR-SZZX-0001",
+    "name": "充电中-03",
+    "category": "轮式机器人",
+    "model": "AGIBOT-A2D",
+    "ip": "10.20.3.5",
+    "status": "CHARGING",
+    "battery": 19,
+    "site": "鼎和大厦 / 22楼创新工作室",
+    "task": "待命",
+    "lastSeen": "3秒前",
+    "firmware": "v2.6.8",
+    "sn": "SNMIN-26-1039",
+    "capabilities": [
+      "可见光",
+      "语音通报"
+    ],
+    "notes": "预计充满：50分钟",
+    "statusUrl": "/api/status"
+  }
+]
