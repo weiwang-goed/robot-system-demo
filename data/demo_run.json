@@ -1,0 +1,66 @@
+{
+  "run_id": "demo_run_042",
+  "status": "PLANNING",
+  "timestamp": "2024-01-15T10:30:00Z",
+  "instruction": "协调多个机器人观察仓库环境，然后搬运物品到指定位置",
+  "llm_thinking": "分析任务：协调多个机器人观察仓库环境，然后搬运物品到指定位置\n\n可用机器人：\n- WR-GYL-0001（仓储管理机器人）\n- QR-SZZX-0001（电力巡检机器狗）\n\n可用能力：\n- 可见光、语音播报、箱类堆垛\n- RGB-D可见光、语音对讲、夜视\n\n规划策略：\n1. 第一阶段（Order 0）：两个机器人并行出发\n   - robot_1 前往3号仓库进行环境观察和扫描\n   - robot_2 同时移动到仓库并进行RGB-D可见光扫描\n\n2. 第二阶段（Order 1）：协作执行搬运任务\n   - robot_1 进行物品定位和提取\n   - robot_2 协助搬运到目标位置\n\n3. 第三阶段（Order 2）：返回基地\n   - robot_1 返回充电站\n   - robot_2 同步返回\n\n生成执行计划...",
+  "llm_global_planning": [
+    {
+      "task_order": 0,
+      "robot_id": "WR-GYL-0001",
+      "task": "前往3号仓库进行环境观察和扫描",
+      "from": "充电站",
+      "to": "3号仓库",
+      "status": "pending"
+    },
+    {
+      "task_order": 0,
+      "robot_id": "QR-SZZX-0001",
+      "task": "进行RGB-D可见光环境扫描",
+      "from": "基地",
+      "to": "3号仓库",
+      "status": "pending"
+    },
+    {
+      "task_order": 1,
+      "robot_id": "WR-GYL-0001",
+      "task": "定位并提取指定物品",
+      "object": "货箱",
+      "count": 3,
+      "status": "pending"
+    },
+    {
+      "task_order": 1,
+      "robot_id": "QR-SZZX-0001",
+      "task": "协助搬运物品到目标区域",
+      "object": "货箱",
+      "count": 3,
+      "status": "pending"
+    },
+    {
+      "task_order": 2,
+      "robot_id": "WR-GYL-0001",
+      "task": "返回充电站",
+      "to": "充电站",
+      "status": "pending"
+    }
+  ],
+  "robot_tool_calls": {
+    "WR-GYL-0001": [
+      { "action": "move_to", "arguments": "warehouse_3", "status": "pending" },
+      { "action": "observe", "arguments": "environment", "status": "pending" },
+      { "action": "scan", "arguments": "visual", "status": "pending" },
+      { "action": "locate_object", "arguments": "cargo_box", "status": "pending" },
+      { "action": "grasp", "arguments": "cargo_box", "status": "pending" },
+      { "action": "move_to", "arguments": "target_location", "status": "pending" },
+      { "action": "place", "arguments": "cargo_box", "status": "pending" },
+      { "action": "return_to_base", "arguments": "charging_station", "status": "pending" }
+    ],
+    "QR-SZZX-0001": [
+      { "action": "move_to", "arguments": "warehouse_3", "status": "pending" },
+      { "action": "scan", "arguments": "rgbd", "status": "pending" },
+      { "action": "assist_transport", "arguments": "cargo_box", "status": "pending" },
+      { "action": "return_to_base", "arguments": "base_station", "status": "pending" }
+    ]
+  }
+}
