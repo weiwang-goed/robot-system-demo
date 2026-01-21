@@ -6,25 +6,40 @@ let selectedId = null;
 // Add: ensure showTab exists so index.html onclick won't throw
 window.showTab = function (tabId) {
   const taskEl = document.getElementById("task-center");
-  const statsEl = document.getElementById("stats");
-  const filtersEl = document.querySelector(".filters");
-  const contentEl = document.querySelector(".content");
+  // const statsEl = document.getElementById("stats");
+  // const filtersEl = document.querySelector(".filters");
+  // const contentEl = document.querySelector(".content");
+
+  const dbEl = document.getElementById("main-dashbord");
+  const roboCtrEl = document.getElementById("robo-control");
 
   if (tabId === "task-center") {
     if (taskEl) taskEl.style.display = "block";
-    if (statsEl) statsEl.style.display = "none";
-    if (filtersEl) filtersEl.style.display = "none";
-    if (contentEl) contentEl.style.display = "none";
+    if (dbEl) dbEl.style.display = "none";
+    if (roboCtrEl) roboCtrEl.style.display = "none";
+    // if (filtersEl) filtersEl.style.display = "none";
+    // if (contentEl) contentEl.style.display = "none";
     // If task-center renderer is available, call it
     if (typeof window.renderTaskCenter === "function") {
       try { window.renderTaskCenter(); } catch (e) { console.error("renderTaskCenter error:", e); }
     }
-  } else {
+  } else if (tabId === "robo-control") {
+    if (roboCtrEl) roboCtrEl.style.display = "";
+
+    if (taskEl) taskEl.style.display = "none";
+    if (dbEl) dbEl.style.display = "none";
+    // if (statsEl) statsEl.style.display = "none";
+    // if (filtersEl) filtersEl.style.display = "none";
+    // if (contentEl) contentEl.style.display = "none";
+  }
+  else {
     // show main dashboard
     if (taskEl) taskEl.style.display = "none";
-    if (statsEl) statsEl.style.display = "";
-    if (filtersEl) filtersEl.style.display = "";
-    if (contentEl) contentEl.style.display = "";
+    // if (statsEl) statsEl.style.display = "";
+    // if (filtersEl) filtersEl.style.display = "";
+    // if (contentEl) contentEl.style.display = "";
+    if (dbEl) dbEl.style.display = "";
+    if (roboCtrEl) roboCtrEl.style.display = "none";
   }
 }
 
@@ -134,8 +149,10 @@ function openControl(id) {
     alert("该机器人未配置 IP（或 controlUrl）");
     return;
   }
-  window.open(url, "_blank", "noopener,noreferrer"); // 新标签打开（推荐）
+  // window.open(url, "_blank", "noopener,noreferrer"); // 新标签打开（推荐）
   // 若你想在当前页跳转：window.location.href = url;
+  showTab('robo-control'); 
+  roboControl.switchTo(id);
 }
 
 
@@ -225,11 +242,27 @@ async function loadRobots() {
   if (!res.ok) throw new Error(`加载 /api/robots 失败：${res.status}`);
   const data = await res.json();
   if (!Array.isArray(data)) throw new Error("robots.json 必须是数组（Array）");
+  initState_A2D(data.filter((i)=>{return i.model== "AGIBOT-A2D"}));
   robots = data;
+  window.robots = robots;
 
   // 默认选中第一条（如果之前选中的 id 仍存在则保留）
   if (!selectedId || !robots.some((r) => r.id === selectedId)) {
     selectedId = robots[0]?.id ?? null;
+  }
+}
+
+function initState_A2D([a2d]) {
+  //更新电量相关的参数
+  a2d.status = "OFFLINE";
+  a2d.battery = null;
+  if (a2d && a2d.statusRes && a2d.statusRes.message=="OK") {
+    a2d.status = "ONLINE";
+    const { energy, isCharging } = a2d.statusRes.data.state.Content.batteryStateList[0];
+    a2d.battery = energy;
+    if (isCharging) {
+      a2d.status = "CHARGING";
+    }
   }
 }
 

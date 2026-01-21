@@ -16,6 +16,9 @@ const fs = require("fs");
 const http = require("http");
 const https = require("https");
 
+// = [新增] SSH 客户端依赖 =
+const { Client } = require('ssh2');
+
 // === 需要你按环境改的 2 行（最关键） ===
 const MQTT_URL = process.env.MQTT_URL || "mqtt://robot-gw:1883";      // MQTT broker
 const MQTT_TOPIC = process.env.MQTT_TOPIC || "robots/+/state";       // 订阅的 topic
@@ -75,8 +78,8 @@ function mergeRobot(id, patch) {
   });
 }
 
-// ===== [新增] 从 roster 读 HTTP 拉取目标，并提前注册所有机器人 =====
-let httpTargets = [];
+// ===== [新增] 从 roster 读 HTTP SSH 拉取目标，并提前注册所有机器人 =====
+let httpTargets = [], sshTargets = [];
 try {
   const rosterRaw = fs.readFileSync(ROBOT_ROSTER_PATH, "utf-8");
   const roster = JSON.parse(rosterRaw);
@@ -87,6 +90,14 @@ try {
       if (r.statusUrl) {
         console.log("statusUrl: " + `id : ${r.id}` +`http://${r.ip}${r.statusUrl}`);
         httpTargets.push({ id: r.id, url:`http://${r.ip}${r.statusUrl}`, static: r });
+      }
+      if (r.sshConfig) {
+        sshTargets.push({
+        id: r.id,
+        sshConfig: r.sshConfig,
+        static: r // 保留静态信息用于合并
+        });
+        console.log('sshTargets: ' + sshTargets);
       }
     }
   } else {
@@ -229,6 +240,7 @@ async function pollHttpTargetsOnce() {
       try {
         const raw = await fetchJsonWithTimeout(t.url, HTTP_TIMEOUT_MS);
         const patch = normalizeHttpPayload(t, raw);
+        patch.statusRes = raw;
 
         // 如果对方没给 status，就别覆盖（让 MQTT/离线判定决定）
         if (patch.status == null) delete patch.status;
@@ -249,6 +261,109 @@ if (httpTargets.length) {
   pollHttpTargetsOnce().catch(() => {});
   setInterval(() => pollHttpTargetsOnce().catch(() => {}), HTTP_POLL_MS);
 }
+
+
+// = SSH 轮询 =
+
+// 执行 SSH 命令并返回结果
+function execSshCommand(config) {
+  return new Promise((resolve, reject) => {
+    const conn = new Client();
+    const { host, port = 22, username, password, command, timeout = 10000 } = config;
+
+    conn.on('ready', () => {
+      console.log(`[ssh] 连接就绪: ${host}`);
+      conn.exec(command, (err, stream) => {
+        if (err) {
+          conn.end();
+          return reject(new Error(`执行命令失败: ${err.message}`));
+        }
+
+        let stdout = '';
+        let stderr = '';
+        stream.on('data', (data) => { stdout += data.toString(); });
+        stream.stderr.on('data', (data) => { stderr += data.toString(); });
+        stream.on('close', (code, signal) => {
+          conn.end();
+          if (code !== 0) {
+            return reject(new Error(`命令退出码 ${code}, stderr: ${stderr}`));
+          }
+          resolve(stdout.trim());
+        });
+      });
+    }).on('error', (err) => {
+      reject(new Error(`SSH 连接错误: ${err.message}`));
+    }).connect({
+      host,
+      port,
+      username,
+      ...(password ? { password } : {}),
+      readyTimeout: timeout
+    });
+
+  });
+}
+
+// SSH 数据归一化适配器（可根据实际返回结构调整）
+function normalizeSshPayload(target, raw) {
+  const s = target.static || {};
+  // 假设 raw 已经是 { status, battery, ... } 格式
+  return {
+    name: raw?.name ?? s.name,
+    status: normalizeStatus(raw?.status),
+    battery: parseBattery(raw?.battery),
+    ip: s.ip, // SSH 目标可能没有直接 IP，用静态配置的
+    ...raw // 合并其他所有字段
+  };
+}
+
+// 轮询所有 SSH 目标
+async function pollSshTargetsOnce() {
+  if (!sshTargets.length) return;
+
+  await Promise.all(
+    sshTargets.map(async (target) => {
+      const { id, sshConfig, static: staticInfo } = target;
+      try {
+        // 1. 执行 SSH 命令获取原始输出
+        const rawOutput = await execSshCommand(sshConfig);
+        //console.log(`[rawOutput] `+ rawOutput);
+
+        // 2. 解析 JSON（支持可选的预处理脚本）
+        let jsonData;
+        if (sshConfig.parseScript) {
+          // 如果有预处理脚本，可以在此调用（示例略）
+          // jsonData = await preprocessWithScript(rawOutput, sshConfig.parseScript);
+          jsonData = JSON.parse(rawOutput); // 简化：直接解析
+        } else {
+          jsonData = JSON.parse(rawOutput.toString().split('\r\n').pop());
+        }
+
+        // 3. 数据归一化（复用 HTTP 的归一化函数，或创建适配器）
+        const patch = normalizeSshPayload(target, jsonData); // 需要定义 normalizeSshPayload
+        // 或直接使用现有的，如果字段结构兼容: const patch = normalizeHttpPayload(target, jsonData);
+
+        // 4. 合并到缓存
+        mergeRobot(id, patch);
+        console.log(`[ssh] 成功更新机器人 ${id} 的状态`);
+      } catch (e) {
+        console.error(`[ssh] 轮询机器人 ${id} 失败:`, e.message);
+        // 可选：在机器人信息中记录错误
+        const r = robotMap.get(id);
+        if (r) r.notes = `SSH 拉取失败: ${e.message}`;
+      }
+    })
+
+  );
+}
+
+// 加载 SSH 目标
+if (sshTargets.length) {
+  const SSH_POLL_MS = Number(process.env.SSH_POLL_MS || 2000); // 轮询间隔，可配置
+  pollSshTargetsOnce().catch(() => {});
+  setInterval(() => pollSshTargetsOnce().catch(() => {}), SSH_POLL_MS);
+}
+
 
 // 每 1 秒刷新 lastSeen + 离线判定（兼容“从未更新过”的机器人）
 setInterval(() => {

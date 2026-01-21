@@ -301,6 +301,16 @@
       color: var(--muted);
       font-size: 12px;
     }
+    .flex {
+      display: flex;
+    }
+    .flex-col {
+      display: flex;
+      flex-direction: column;
+    }
+    .flex1 {
+      flex: 1;
+    }
     @media (max-width: 1100px) {
       .content{grid-template-columns: 1fr}
       .sidebar{display:none}
