@@ -243,6 +243,7 @@ async function loadRobots() {
   const data = await res.json();
   if (!Array.isArray(data)) throw new Error("robots.json 必须是数组（Array）");
   initState_A2D(data.filter((i)=>{return i.model== "AGIBOT-A2D"}));
+  initState_A2(data.filter((i)=>{return i.model== "A2_T3D1_FLAGSHIP"}));
   robots = data;
   window.robots = robots;
 
@@ -262,6 +263,20 @@ function initState_A2D([a2d]) {
     a2d.battery = energy;
     if (isCharging) {
       a2d.status = "CHARGING";
+    }
+  }
+}
+
+function initState_A2([a2]) {
+  //更新电量相关的参数
+  a2.status = "OFFLINE";
+  a2.battery = null;
+  if (a2 && a2.data) {
+    const { charge, charger_state } = a2.data;
+    a2.status = "ONLINE";
+    a2.battery = charge;
+    if (charger_state	== "ChargerConnected") {
+      a2.status = "CHARGING";
     }
   }
 }
