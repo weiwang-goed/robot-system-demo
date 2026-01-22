@@ -441,3 +441,48 @@ app.post("/api/tasks", async (req, res) => {
     res.status(500).json({ error: e.message || String(e) });
   }
 });
+
+// ===== [新增] FastAPI 代理路由 =====
+// 将 POST /api/generate_plan 转发到 FastAPI 后端（端口 9000）
+const FASTAPI_URL = process.env.FASTAPI_URL || "http://127.0.0.1:9000";
+
+app.post("/api/generate_plan", async (req, res) => {
+  try {
+    const payload = req.body; // { instruction, site }
+    
+    // 转发请求到 FastAPI
+    const urlObj = new URL("/api/generate_plan", FASTAPI_URL);
+    const options = {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    };
+
+    const proxyReq = https.request(urlObj, options, (proxyRes) => {
+      let data = "";
+      proxyRes.on("data", (chunk) => {
+        data += chunk;
+      });
+      proxyRes.on("end", () => {
+        try {
+          const result = JSON.parse(data);
+          res.status(proxyRes.statusCode || 200).json(result);
+        } catch (parseErr) {
+          res.status(500).json({ error: "Failed to parse FastAPI response" });
+        }
+      });
+    });
+
+    proxyReq.on("error", (err) => {
+      console.error("FastAPI proxy error:", err.message);
+      res.status(503).json({ error: "FastAPI backend unavailable", detail: err.message });
+    });
+
+    proxyReq.write(JSON.stringify(payload));
+    proxyReq.end();
+  } catch (e) {
+    console.error("POST /api/generate_plan proxy error:", e);
+    res.status(500).json({ error: e.message || String(e) });
+  }
+});
