@@ -26,6 +26,10 @@
           <span>任务中心</span>
           <span class="meta">队列</span>
         </a>
+        <a href="#" onclick="showTab('robo-control'); return false;">
+          <span>机器人配置</span>
+          <span class="meta">控制</span>
+        </a>
         <a href="#" onclick="return false;">
           <span>地图与区域</span>
           <span class="meta">站点</span>
@@ -75,112 +79,119 @@
         <!-- task-center.js 将渲染到这里 -->
       </section>
 
-      <section class="grid" id="stats"></section>
-
-      <section class="filters">
-        <div class="filters-left">
-          <div class="field">
-            🔎 <input id="q" placeholder="搜索：名称 / IP / 型号 / 站点 / SN" oninput="render()"/>
-          </div>
-
-          <div class="field" style="min-width: 190px">
-            🧩
-            <select id="cat" onchange="render()">
-              <option value="">全部类别</option>
-            </select>
-          </div>
-
-          <div class="field" style="min-width: 170px">
-            ⚡
-            <select id="st" onchange="render()">
-              <option value="">全部状态</option>
-              <option value="ONLINE">在线</option>
-              <option value="OFFLINE">离线</option>
-              <option value="CHARGING">充电中</option>
-              <option value="ALARM">告警</option>
-            </select>
-          </div>
-
-          <div class="field" style="min-width: 190px">
-            🏷️
-            <select id="model" onchange="render()">
-              <option value="">全部型号</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="hint">提示：点击表格行可查看详情；支持在详情中一键联动“打开视频/下发任务/查看日志”。</div>
+      <section id="robo-control" class="flex1" style="display:none; padding:12px;">
+        <!-- robo-control.js 将渲染到这里 -->
       </section>
 
-      <section class="content">
-        <div class="card table-card">
-          <div class="table-head">
-            <div class="title">机器人列表</div>
-            <div class="hint" id="countHint">—</div>
-          </div>
-          <div style="overflow:auto; max-height: 520px;">
-            <table>
-              <thead>
-                <tr>
-                  <th style="width:140px">状态</th>
-                  <th>名称</th>
-                  <th style="width:150px">类别</th>
-                  <th style="width:160px">型号</th>
-                  <th style="width:140px">IP</th>
-                  <th style="width:220px">站点/区域</th>
-                  <th style="width:90px">电量</th>
-                  <th style="width:200px">当前任务</th>
-                  <th style="width:110px">心跳</th>
-                  <th style="width:210px; text-align:right;">操作</th>
-                </tr>
-              </thead>
-              <tbody id="rows"></tbody>
-            </table>
-          </div>
-        </div>
+      <section id="main-dashbord" style="">
+        <section class="grid" id="stats"></section>
 
-        <aside class="card detail" id="detail">
-          <div class="head">
+        <section class="filters">
+          <div class="filters-left">
+            <div class="field">
+              🔎 <input id="q" placeholder="搜索：名称 / IP / 型号 / 站点 / SN" oninput="render()"/>
+            </div>
+
+            <div class="field" style="min-width: 190px">
+              🧩
+              <select id="cat" onchange="render()">
+                <option value="">全部类别</option>
+              </select>
+            </div>
+
+            <div class="field" style="min-width: 170px">
+              ⚡
+              <select id="st" onchange="render()">
+                <option value="">全部状态</option>
+                <option value="ONLINE">在线</option>
+                <option value="OFFLINE">离线</option>
+                <option value="CHARGING">充电中</option>
+                <option value="ALARM">告警</option>
+              </select>
+            </div>
+
+            <div class="field" style="min-width: 190px">
+              🏷️
+              <select id="model" onchange="render()">
+                <option value="">全部型号</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="hint">提示：点击表格行可查看详情；支持在详情中一键联动“打开视频/下发任务/查看日志”。</div>
+        </section>
+
+        <section class="content">
+          <div class="card table-card">
+            <div class="table-head">
+              <div class="title">机器人列表</div>
+              <div class="hint" id="countHint">—</div>
+            </div>
+            <div style="overflow:auto; max-height: 520px;">
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width:140px">状态</th>
+                    <th>名称</th>
+                    <th style="width:150px">类别</th>
+                    <th style="width:160px">型号</th>
+                    <th style="width:140px">IP</th>
+                    <th style="width:220px">站点/区域</th>
+                    <th style="width:90px">电量</th>
+                    <th style="width:200px">当前任务</th>
+                    <th style="width:110px">心跳</th>
+                    <th style="width:210px; text-align:right;">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="rows"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <aside class="card detail" id="detail">
+            <div class="head">
+              <div>
+                <h3 id="d_name">请选择一个机器人</h3>
+                <div class="id" id="d_id">—</div>
+              </div>
+              <div id="d_status"></div>
+            </div>
+
+            <div class="sep"></div>
+
+            <div class="kv" id="d_kv"></div>
+
+            <div class="sep"></div>
+
             <div>
-              <h3 id="d_name">请选择一个机器人</h3>
-              <div class="id" id="d_id">—</div>
+              <div class="label" style="color:var(--muted); font-size:12px;">能力</div>
+              <div class="caps" id="d_caps"></div>
             </div>
-            <div id="d_status"></div>
-          </div>
 
-          <div class="sep"></div>
+            <div class="sep"></div>
 
-          <div class="kv" id="d_kv"></div>
-
-          <div class="sep"></div>
-
-          <div>
-            <div class="label" style="color:var(--muted); font-size:12px;">能力</div>
-            <div class="caps" id="d_caps"></div>
-          </div>
-
-          <div class="sep"></div>
-
-          <div>
-            <div class="label" style="color:var(--muted); font-size:12px;">快捷操作</div>
-            <div class="caps">
-              <span class="chip" onclick="alert('打开实时视频：/robots/<built-in function id>/stream')">打开视频</span>
-              <span class="chip" onclick="alert('下发任务：/tasks/create (robot_id)')">下发任务</span>
-              <span class="chip" onclick="alert('查看日志：/robots/<built-in function id>/logs')">查看日志</span>
-              <span class="chip" onclick="alert('远程控制：/teleop/<built-in function id>')">远程驾驶</span>
-              <span class="chip" onclick="alert('重启设备：/robots/<built-in function id>/command reboot')">重启</span>
+            <div>
+              <div class="label" style="color:var(--muted); font-size:12px;">快捷操作</div>
+              <div class="caps">
+                <span class="chip" onclick="alert('打开实时视频：/robots/<built-in function id>/stream')">打开视频</span>
+                <span class="chip" onclick="alert('下发任务：/tasks/create (robot_id)')">下发任务</span>
+                <span class="chip" onclick="alert('查看日志：/robots/<built-in function id>/logs')">查看日志</span>
+                <span class="chip" onclick="alert('远程控制：/teleop/<built-in function id>')">远程驾驶</span>
+                <span class="chip" onclick="alert('重启设备：/robots/<built-in function id>/command reboot')">重启</span>
+              </div>
             </div>
-          </div>
 
-          <div class="footnote">
-            建议对接：资产台账（SN/编号） · 网关心跳（MQTT） · 任务系统（工单） · 告警规则（阈值/异常检测）
-          </div>
-        </aside>
+            <div class="footnote">
+              建议对接：资产台账（SN/编号） · 网关心跳（MQTT） · 任务系统（工单） · 告警规则（阈值/异常检测）
+            </div>
+          </aside>
+        </section>
       </section>
     </main>
   </div>
 
   <script src="./assets/app.js"></script>
   <script src="./assets/task-center-mvp.js"></script>
+  <script src="./assets/robo-control.js"></script>
  </body>
 </html>

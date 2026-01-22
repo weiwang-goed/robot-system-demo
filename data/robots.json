@@ -26,7 +26,7 @@
     "name": "电力巡检机器狗001",
     "category": "四足机器人",
     "model": "Go2-EDU",
-    "ip": "10.20.3.3",
+    "ip": "183.24.158.245",
     "status": "ALARM",
     "battery": 43,
     "site": "鼎和大厦22楼",
@@ -39,7 +39,8 @@
       "语音对讲",
       "夜视"
     ],
-    "notes": "告警：避障异常（近3分钟 4次）; 网络连接异常（近60分钟 2次）"
+    "notes": "告警：避障异常（近3分钟 4次）; 网络连接异常（近60分钟 2次）",
+    "controlUrl": ":180/#/home"
   },
   {
     "id": "DR-WX-0001",
@@ -63,13 +64,41 @@
     "statusUrl": "/api/status"
   },
   {
+    "id": "10041B700128",
+    "name": "人形机器人_远征A2",
+    "category": "通用机器人",
+    "model": "A2_T3D1_FLAGSHIP",
+    "ip": "192.168.8.34",
+    "status": "OFFLINE",
+    "battery": null,
+    "site": "xxx",
+    "task": "—",
+    "lastSeen": "1分钟前",
+    "firmware": "v1.2.24",
+    "sn": "A210041B700128",
+    "capabilities": [
+      "4K云台",
+      "RTK",
+      "航线任务"
+    ],
+    "notes": "离线：疑似网络未连通",
+    "statusUrl": "/api/status",
+    "sshConfig": {
+      "host": "192.168.8.34",
+      "port": 22,
+      "username": "agi",
+      "password": "1",
+      "command": "curl -i  -H 'content-type:application/json'  -H 'timeout: 1000'  -X POST 'http://192.168.100.100:56421/rpc/aimdk.protocol.HalBmsService/GetBmsState'  -d '{}'"
+    }
+  },
+  {
     "id": "WR-SZZX-0001",
-    "name": "充电中-03",
+    "name": "数据采集机器人001",
     "category": "轮式机器人",
     "model": "AGIBOT-A2D",
-    "ip": "10.20.3.5",
+    "ip": "127.0.0.1",
     "status": "CHARGING",
-    "battery": 19,
+    "battery": null,
     "site": "鼎和大厦22楼",
     "task": "待命",
     "lastSeen": "3秒前",
@@ -80,6 +109,7 @@
       "语音通报"
     ],
     "notes": "预计充满：50分钟",
-    "statusUrl": "/api/status"
+    "statusUrl": ":8000/agv/getState",
+    "controlUrl": ":8000/public/a2dViewer/index.html"
   }
 ]
