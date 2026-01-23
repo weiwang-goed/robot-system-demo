@@ -22,8 +22,8 @@
     "statusUrl": "/api/status"
   },
   {
-    "id": "QR-SZZX-0001",
-    "name": "电力巡检机器狗001",
+    "id": "Vehicle_11",
+    "name": "电力巡检机器狗_中科11号",
     "category": "四足机器人",
     "model": "Go2-EDU",
     "ip": "183.24.158.245",
