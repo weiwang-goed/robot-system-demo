@@ -20,8 +20,9 @@ const https = require("https");
 const { Client } = require('ssh2');
 
 // === 需要你按环境改的 2 行（最关键） ===
-const MQTT_URL = process.env.MQTT_URL || "mqtt://robot-gw:1883";      // MQTT broker
-const MQTT_TOPIC = process.env.MQTT_TOPIC || "robots/+/state";       // 订阅的 topic
+const MQTT_URL = process.env.MQTT_URL || "183.24.158.245";      // MQTT broker
+const MQTT_PORT = process.env.MQTT_PORT || "11883";      // MQTT broker
+const MQTT_TOPIC = process.env.MQTT_TOPIC || "/Vehicle_11/vehicle_state";       // 订阅的 topic
 const CONNECT_TIMEOUT_MS = Number(process.env.CONNECT_TIMEOUT_MS || 10000);
 
 const PORT = process.env.PORT || 8000;
@@ -108,17 +109,30 @@ try {
 }
 
 // ===================== MQTT =====================
-const client = mqtt.connect(MQTT_URL, {
+const client = mqtt.connect({
+  host: MQTT_URL,
+  port: MQTT_PORT,
+  // clientId: getClientId(deviceId),
+  // username: deviceId,
+  // password:HmacSHA256(secret, timestamp).toString(),
+  // ca: TRUSTED_CA,
+  // protocol: 'mqtts',
+  // rejectUnauthorized: false,
+  // keepalive: 120,
   connectTimeout: CONNECT_TIMEOUT_MS,           // 连接超时
   reconnectPeriod: CONNECT_TIMEOUT_MS * 10,     // 自动重连间隔（0=不重连）
 });
 
 client.on("connect", () => {
-  console.log("[mqtt] connected:", MQTT_URL);
+  console.log(`[mqtt] connected: ${MQTT_URL}:${MQTT_PORT}`);
   client.subscribe(MQTT_TOPIC, (err) => {
     if (err) console.error("[mqtt] subscribe error:", err);
     else console.log("[mqtt] subscribed:", MQTT_TOPIC);
   });
+});
+
+client.on("reconnect", (...val) => {
+  console.log("[mqtt] reconnect:", val);
 });
 
 client.on("message", (topic, payload) => {
@@ -129,7 +143,7 @@ client.on("message", (topic, payload) => {
     if (!id) return;
 
     // 你们上报什么就合并什么：status/battery/task/site/ip/model/category/name...
-    mergeRobot(id, msg);
+    mergeRobot(id, { statusMqtt : msg });
   } catch (e) {
     console.error("[mqtt] bad payload:", e);
   }
