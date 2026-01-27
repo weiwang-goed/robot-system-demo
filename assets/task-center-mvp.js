@@ -31,6 +31,24 @@
     CHARGING: { bg: "#f0fdf4", border: "#84cc16", text: "#3f6212", dot: "#84cc16" }
   };
 
+  // 为每个机器人分配颜色
+  const robotColors = {};
+  const colorPalette = [
+    { bg: "#fef3c7", border: "#f59e0b", text: "#92400e" }, // amber
+    { bg: "#dbeafe", border: "#0284c7", text: "#0c2340" }, // sky blue
+    { bg: "#fecaca", border: "#dc2626", text: "#7f1d1d" }, // red
+    { bg: "#d1fae5", border: "#059669", text: "#065f46" }, // emerald
+    { bg: "#e9d5ff", border: "#a855f7", text: "#6b21a8" }  // purple
+  ];
+
+  function getRobotColor(robotId) {
+    if (!robotColors[robotId]) {
+      const idx = Object.keys(robotColors).length % colorPalette.length;
+      robotColors[robotId] = colorPalette[idx];
+    }
+    return robotColors[robotId];
+  }
+
   function getStatusColor(status) {
     return statusColors[status] || statusColors.pending;
   }
@@ -104,80 +122,8 @@
     }
   }
 
-  function generatePlanFromLLM(instruction, robots) {
-    const timestamp = new Date().toISOString();
-    const runId = `run_${Date.now()}`;
-
-    const robotIds = robots.map(r => r.id);
-    const capabilities = robots.flatMap(r => r.capabilities || []);
-
-    const tasks = [];
-    const toolCalls = {};
-
-    robotIds.forEach(rid => {
-      toolCalls[rid] = [];
-    });
-
-    if (instruction.includes("观察") || instruction.includes("监控") || instruction.includes("巡检")) {
-      tasks.push({
-        task_order: 0,
-        robot_id: robotIds[0],
-        task: "扫描并观察周围环境",
-        status: "pending"
-      });
-      if (robotIds[0]) {
-        toolCalls[robotIds[0]].push(
-          { action: "move_to", arguments: "target_area", status: "pending" },
-          { action: "observe", arguments: "environment", status: "pending" }
-        );
-      }
-    }
-
-    if (instruction.includes("搬运") || instruction.includes("移动")) {
-      if (robotIds[1]) {
-        tasks.push({
-          task_order: 0,
-          robot_id: robotIds[1],
-          task: "前往指定位置",
-          status: "pending"
-        });
-        toolCalls[robotIds[1]].push(
-          { action: "move_to", arguments: "destination", status: "pending" },
-          { action: "locate_object", arguments: "target", status: "pending" }
-        );
-      }
-    }
-
-    tasks.push({
-      task_order: 1,
-      robot_id: robotIds[0],
-      task: "完成协作任务",
-      status: "pending"
-    });
-
-    if (robotIds[0]) {
-      toolCalls[robotIds[0]].push(
-        { action: "return_to_base", arguments: "charging_station", status: "pending" }
-      );
-    }
-
-    return {
-      run_id: runId,
-      status: "PLANNING",
-      timestamp,
-      instruction,
-      llm_global_planning: tasks,
-      robot_tool_calls: toolCalls,
-      llm_thinking: `Analyzing task: "${instruction}"\n\n` +
-        `Available robots: ${robotIds.join(", ")}\n` +
-        `Capabilities: ${capabilities.join(", ")}\n\n` +
-        `Planning strategy:\n` +
-        `1. Allocate robots based on task requirements\n` +
-        `2. Create sequential task orders for multi-robot coordination\n` +
-        `3. Generate tool call sequences for each robot\n\n` +
-        `Execution plan generated successfully.`
-    };
-  }
+  // Removed: generatePlanFromLLM function
+  // Now using real backend LLM planner via /api/generate_plan
 
   class MVPApp {
     constructor(robots, demoData) {
@@ -185,6 +131,7 @@
       this.planData = demoData;
       this.selectedSite = null;
       this.selectedRobotId = null;
+      this.selectedTaskOrder = null;
       this.selectedTaskKey = null;
       this.executionState = {};
       this.isRunning = false;
@@ -199,7 +146,9 @@
         this.parseData();
         if (this.planData.llm_global_planning && this.planData.llm_global_planning.length > 0) {
           const firstRobot = this.planData.llm_global_planning[0].robot_id;
+          const firstOrder = this.planData.llm_global_planning[0].task_order || 0;
           this.selectedRobotId = firstRobot;
+          this.selectedTaskOrder = firstOrder;
         }
       }
     }
@@ -237,9 +186,16 @@
         : [];
     }
 
-    selectTask(robotId, taskIdx) {
+    // 获取指定机器人和order的task
+    getTaskByRobotAndOrder(robotId, taskOrder) {
+      const planning = this.planData.llm_global_planning || [];
+      return planning.find(t => t.robot_id === robotId && t.task_order === taskOrder);
+    }
+
+    selectTask(robotId, taskOrder) {
       this.selectedRobotId = robotId;
-      this.selectedTaskKey = `${robotId}:${taskIdx}`;
+      this.selectedTaskOrder = taskOrder;
+      this.selectedTaskKey = `${robotId}:${taskOrder}`;
     }
 
     async startExecution() {
@@ -247,28 +203,72 @@
 
       this.isRunning = true;
       const planning = this.planData.llm_global_planning || [];
-
-      for (let i = 0; i < planning.length; i++) {
-        const task = planning[i];
-        task.status = "running";
-        this.updateUI();
-        await this.sleep(10000 + Math.random() * 5000);
-
-        task.status = "done";
-        const toolCalls = this.getRobotToolCalls(task.robot_id);
-        for (let j = 0; j < toolCalls.length; j++) {
-          if (toolCalls[j].status !== "done") {
-            toolCalls[j].status = "running";
-            this.updateUI();
-            await this.sleep(3000 + Math.random() * 2000);
-            toolCalls[j].status = "done";
-            this.updateUI();
-          }
+      
+      // 按 task_order 分组任务
+      const tasksByOrder = {};
+      planning.forEach(task => {
+        const order = task.task_order || 0;
+        if (!tasksByOrder[order]) {
+          tasksByOrder[order] = [];
         }
+        tasksByOrder[order].push(task);
+      });
+
+      // 按顺序执行每个 order
+      const orders = Object.keys(tasksByOrder).map(Number).sort((a, b) => a - b);
+      
+      for (const order of orders) {
+        const tasksInOrder = tasksByOrder[order];
+        
+        // 同一 order 内的所有任务并行执行
+        const orderPromises = tasksInOrder.map(task => 
+          this.executeTask(task)
+        );
+        
+        // 等待该 order 的所有任务完成
+        await Promise.all(orderPromises);
       }
 
       this.planData.status = "COMPLETED";
       this.isRunning = false;
+      this.updateUI();
+    }
+
+    async executeTask(task) {
+      // 执行单个任务
+      task.status = "running";
+      this.updateUI();
+      
+      // 模拟任务执行时间：10-15秒
+      await this.sleep(10000 + Math.random() * 5000);
+
+      // 执行该任务对应机器人的 tool calls（在任务完成前执行）
+      const toolCalls = this.getRobotToolCalls(task.robot_id);
+      if (toolCalls && toolCalls.length > 0) {
+        // tool calls 还没完成，保持任务状态为 running
+        for (const toolCall of toolCalls) {
+          if (toolCall.status !== "done") {
+            await this.executeToolCall(toolCall);
+          }
+        }
+      }
+
+      // 所有 tool calls 完成后，任务才标记为完成
+      task.status = "done";
+      
+      this.updateUI();
+    }
+
+    async executeToolCall(toolCall) {
+      // 执行单个 tool call
+      toolCall.status = "running";
+      this.updateUI();
+      
+      // 模拟 tool call 执行时间：3-5秒
+      await this.sleep(3000 + Math.random() * 2000);
+
+      // tool call 完成
+      toolCall.status = "done";
       this.updateUI();
     }
 
@@ -320,18 +320,18 @@
       const title = createEl("h1", "", {
         style: { margin: "0", fontSize: "20px", fontWeight: "700", color: "#0b1720" }
       });
-      title.textContent = "Multi-Robot LLM Planner";
+      title.textContent = "多机器人 LLM 规划器";
       left.appendChild(title);
 
       if (this.planData) {
         const info = createEl("div", "", { style: { display: "flex", gap: "16px" } });
         const runId = createEl("div", "", { style: { fontSize: "13px", color: "#475569" } });
-        runId.innerHTML = `<strong>Run:</strong> ${esc(this.planData.run_id || "N/A")}`;
+        runId.innerHTML = `<strong>执行ID:</strong> ${esc(this.planData.run_id || "N/A")}`;
         info.appendChild(runId);
 
         const status = createEl("div", "", { style: { fontSize: "13px", color: "#475569" } });
         const statusColor = getStatusColor(this.planData.status?.toLowerCase() || "pending");
-        status.innerHTML = `<strong>Status:</strong> <span style="color:${statusColor.text}; font-weight:600">${esc(this.planData.status || "N/A")}</span>`;
+        status.innerHTML = `<strong>状态:</strong> <span style="color:${statusColor.text}; font-weight:600">${esc(this.planData.status || "N/A")}</span>`;
         info.appendChild(status);
         left.appendChild(info);
       }
@@ -352,26 +352,39 @@
             fontWeight: "600"
           }
         });
-        executeBtn.textContent = "Execute Plan";
+        executeBtn.textContent = "执行规划";
         executeBtn.addEventListener("click", () => this.startExecution());
         right.appendChild(executeBtn);
       }
 
-      ["Pause", "Export"].forEach(label => {
-        const btn = createEl("button", "", {
-          style: {
-            padding: "6px 14px",
-            fontSize: "12px",
-            background: "#f1f5f9",
-            border: "1px solid #d1d5db",
-            borderRadius: "6px",
-            cursor: "pointer",
-            fontWeight: "500"
-          }
-        });
-        btn.textContent = label;
-        right.appendChild(btn);
+      const pauseBtn = createEl("button", "", {
+        style: {
+          padding: "6px 14px",
+          fontSize: "12px",
+          background: "#f1f5f9",
+          border: "1px solid #d1d5db",
+          borderRadius: "6px",
+          cursor: "pointer",
+          fontWeight: "500"
+        }
       });
+      pauseBtn.textContent = "暂停";
+      right.appendChild(pauseBtn);
+
+      const exportBtn = createEl("button", "", {
+        style: {
+          padding: "6px 14px",
+          fontSize: "12px",
+          background: "#f1f5f9",
+          border: "1px solid #d1d5db",
+          borderRadius: "6px",
+          cursor: "pointer",
+          fontWeight: "500"
+        }
+      });
+      exportBtn.textContent = "导出";
+      right.appendChild(exportBtn);
+
       topBar.appendChild(right);
     }
 
@@ -398,7 +411,7 @@
       const siteLabel = createEl("div", "", {
         style: { fontSize: "12px", fontWeight: "700", color: "#0b1720", marginBottom: "6px" }
       });
-      siteLabel.textContent = "Select Site";
+      siteLabel.textContent = "选择站点";
       siteSection.appendChild(siteLabel);
 
       const siteSelect = createEl("select", "", {
@@ -431,7 +444,7 @@
       const robotsLabel = createEl("div", "", {
         style: { fontSize: "12px", fontWeight: "700", color: "#0b1720", marginBottom: "6px" }
       });
-      robotsLabel.textContent = "Available Robots";
+      robotsLabel.textContent = "可用机器人";
       robotsInfo.appendChild(robotsLabel);
 
       const robotsList = createEl("div", "", {
@@ -446,7 +459,7 @@
         const empty = createEl("div", "", {
           style: { fontSize: "12px", color: "#9ca3af" }
         });
-        empty.textContent = "No robots available";
+        empty.textContent = "无可用的机器人";
         robotsList.appendChild(empty);
       } else {
         available.forEach(robot => {
@@ -475,7 +488,7 @@
       const taskLabel = createEl("div", "", {
         style: { fontSize: "12px", fontWeight: "700", color: "#0b1720", marginBottom: "6px" }
       });
-      taskLabel.textContent = "Task Description";
+      taskLabel.textContent = "任务描述";
       taskSection.appendChild(taskLabel);
 
       const inputContainer = createEl("div", "", {
@@ -511,69 +524,60 @@
           height: "44px"
         }
       });
-      planBtn.textContent = "Generate Plan";
+      planBtn.textContent = "生成规划";
       planBtn.addEventListener("click", async () => {
         const instruction = taskInput.value.trim();
         if (!instruction) {
-          alert("Please enter a task description");
+          alert("请输入任务描述");
           return;
         }
 
         const availableRobots = this.getAvailableRobots();
         if (availableRobots.length === 0) {
-          alert("No robots available in this site");
+          alert("该站点没有可用的机器人");
           return;
         }
 
         planBtn.disabled = true;
-        planBtn.textContent = "Planning...";
+        planBtn.textContent = "规划中...";
 
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        try {
+          // 调用后端 /api/generate_plan 接口，使用真实的 llm_planner_baidu
+          const response = await fetch("/api/generate_plan", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              instruction: instruction,
+              site: this.selectedSite || ""
+            })
+          });
 
-        this.planData = generatePlanFromLLM(instruction, availableRobots);
-        planBtn.disabled = false;
-        planBtn.textContent = "Generate Plan";
-        taskInput.value = "";
-        this.render();
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            const errorMsg = errorData.detail || `服务器错误: ${response.status}`;
+            alert(`生成规划失败: ${errorMsg}`);
+            planBtn.disabled = false;
+            planBtn.textContent = "生成规划";
+            return;
+          }
+
+          const planData = await response.json();
+          this.planData = planData;
+          taskInput.value = "";
+          this.render();
+        } catch (err) {
+          console.error("Error generating plan:", err);
+          alert(`错误: ${err.message}`);
+        } finally {
+          planBtn.disabled = false;
+          planBtn.textContent = "生成规划";
+        }
       });
       inputContainer.appendChild(planBtn);
       taskSection.appendChild(inputContainer);
       container.appendChild(taskSection);
-
-      const loadDemoBtn = createEl("button", "", {
-        style: {
-          padding: "8px 16px",
-          background: "#059669",
-          color: "#fff",
-          border: "none",
-          borderRadius: "6px",
-          cursor: "pointer",
-          fontWeight: "600",
-          fontSize: "12px",
-          height: "44px",
-          alignSelf: "flex-end"
-        }
-      });
-      loadDemoBtn.textContent = "Load Demo";
-      loadDemoBtn.addEventListener("click", async () => {
-        loadDemoBtn.disabled = true;
-        loadDemoBtn.textContent = "Loading...";
-        const demoData = await loadDemoData();
-        if (demoData) {
-          this.planData = demoData;
-          this.render();
-        } else {
-          alert("Failed to load demo data");
-        }
-        loadDemoBtn.disabled = false;
-        loadDemoBtn.textContent = "Load Demo";
-      });
-
-      const btnContainer = createEl("div", "", {
-        style: { display: "flex", gap: "8px", alignSelf: "flex-end" }
-      });
-      btnContainer.appendChild(loadDemoBtn);
-      container.appendChild(btnContainer);
 
       panel.appendChild(container);
     }
@@ -584,7 +588,7 @@
           background: "#f6f8fa",
           borderBottom: "1px solid #e6eef7",
           padding: "12px 20px",
-          maxHeight: "220px",
+          maxHeight: "200px",
           overflow: "hidden",
           display: "flex",
           gap: "16px"
@@ -592,63 +596,218 @@
       });
       root.appendChild(panel);
 
-      const thinkingSection = createEl("div", "", { style: { flex: "1" } });
-      const thinkingTitle = createEl("div", "", {
+      // 判断响应类型：查询（information）还是规划（planning/task）
+      const isInformation = this.planData.type === "information";
+      const isQuery = this.planData.answer && this.planData.status === "ANSWERED";
+
+      const leftSection = createEl("div", "", { style: { flex: "1" } });
+      const leftTitle = createEl("div", "", {
         style: { fontSize: "12px", fontWeight: "700", color: "#0b1720", marginBottom: "8px" }
       });
-      thinkingTitle.textContent = "LLM Thinking Process";
-      thinkingSection.appendChild(thinkingTitle);
+      
+      if (isInformation || isQuery) {
+        // === 查询响应类型 ===
+        leftTitle.textContent = "📋 Query Response (Information)";
+        leftSection.appendChild(leftTitle);
 
-      const thinkingContent = createEl("div", "", {
-        style: {
-          background: "#ffffff",
-          border: "1px solid #e6eef7",
-          borderRadius: "6px",
-          padding: "10px",
-          fontSize: "11px",
-          color: "#475569",
-          lineHeight: "1.5",
-          maxHeight: "180px",
-          overflow: "auto",
-          fontFamily: "'Monaco', 'Courier New', monospace",
-          whiteSpace: "pre-wrap",
-          wordBreak: "break-word"
+        const queryContent = createEl("div", "", {
+          style: {
+            background: "#ffffff",
+            border: "1px solid #e6eef7",
+            borderRadius: "6px",
+            padding: "10px",
+            fontSize: "11px",
+            color: "#475569",
+            lineHeight: "1.6",
+            maxHeight: "150px",
+            overflow: "auto",
+            fontFamily: "'Monaco', 'Courier New', monospace"
+          }
+        });
+
+        const queryDisplay = `问题 (Question):\n${this.planData.question || this.planData.instruction || "N/A"}\n\n` +
+          `状态 (Status):\n${this.planData.status || "ANSWERED"}\n\n` +
+          `答案 (Answer):\n${this.planData.answer || "No answer provided"}\n\n` +
+          `模型 (Model):\n${this.planData.model || "unknown"}\n\n` +
+          `来源 (Sources):\n${JSON.stringify(this.planData.sources || [], null, 2)}`;
+
+        queryContent.textContent = queryDisplay;
+        leftSection.appendChild(queryContent);
+        panel.appendChild(leftSection);
+
+      } else {
+        // === 任务规划类型 ===
+        leftTitle.textContent = "🧠 规划与思考过程";
+        leftSection.appendChild(leftTitle);
+
+        const thinkingContent = createEl("div", "", {
+          style: {
+            background: "#ffffff",
+            border: "1px solid #e6eef7",
+            borderRadius: "6px",
+            padding: "10px",
+            fontSize: "11px",
+            color: "#475569",
+            lineHeight: "1.5",
+            maxHeight: "150px",
+            overflow: "auto",
+            fontFamily: "'Monaco', 'Courier New', monospace",
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word"
+          }
+        });
+        
+        // 包含 thinking process 和 constraints
+        let thinkingDisplay = this.planData.llm_thinking || "思考过程...";
+        if (this.planData.constraints && this.planData.constraints.length > 0) {
+          thinkingDisplay += "\n\n📋 约束条件 (Constraints):\n" + 
+            JSON.stringify(this.planData.constraints, null, 2);
         }
-      });
-      thinkingContent.textContent = this.planData.llm_thinking || "思考过程...";
-      thinkingSection.appendChild(thinkingContent);
-      panel.appendChild(thinkingSection);
+        
+        thinkingContent.textContent = thinkingDisplay;
+        leftSection.appendChild(thinkingContent);
+        panel.appendChild(leftSection);
+      }
 
-      const planJsonSection = createEl("div", "", { style: { flex: "1" } });
-      const planTitle = createEl("div", "", {
+      const rightSection = createEl("div", "", { style: { flex: "1" } });
+      const rightTitle = createEl("div", "", {
         style: { fontSize: "12px", fontWeight: "700", color: "#0b1720", marginBottom: "8px" }
       });
-      planTitle.textContent = "Generated Plan (JSON)";
-      planJsonSection.appendChild(planTitle);
 
-      const planJson = createEl("div", "", {
-        style: {
-          background: "#0b1220",
-          border: "1px solid #1e293b",
-          borderRadius: "6px",
-          padding: "10px",
-          fontSize: "10px",
-          color: "#e6eef8",
-          maxHeight: "180px",
-          overflow: "auto",
-          fontFamily: "'Monaco', 'Courier New', monospace"
+      if (isInformation || isQuery) {
+        rightTitle.textContent = "📊 问题答复 (JSON)";
+      } else {
+        rightTitle.textContent = "📊 任务拆解";
+      }
+      rightSection.appendChild(rightTitle);
+
+      if (!isInformation && !isQuery) {
+        // 任务规划：显示 robot_tool_calls 的列表形式（按机器人分组）
+        const planList = createEl("div", "", {
+          style: {
+            background: "#ffffff",
+            border: "1px solid #e6eef7",
+            borderRadius: "6px",
+            padding: "8px",
+            fontSize: "11px",
+            color: "#475569",
+            maxHeight: "150px",
+            overflow: "auto"
+          }
+        });
+
+        const robotToolCallsData = this.planData.robot_tool_calls || {};
+        
+        // 检查是对象还是数组
+        let robotCallsMap = {};
+        if (Array.isArray(robotToolCallsData)) {
+          // 如果是数组，按 robot_id 分组
+          robotToolCallsData.forEach(call => {
+            const robotId = call.robot_id || "Unknown";
+            if (!robotCallsMap[robotId]) {
+              robotCallsMap[robotId] = [];
+            }
+            robotCallsMap[robotId].push(call);
+          });
+        } else if (typeof robotToolCallsData === 'object') {
+          // 如果是对象，直接使用
+          robotCallsMap = robotToolCallsData;
         }
-      });
-      const planObj = {
-        run_id: this.planData.run_id,
-        status: this.planData.status,
-        instruction: this.planData.instruction,
-        llm_global_planning: this.planData.llm_global_planning,
-        robot_tool_calls: this.planData.robot_tool_calls
-      };
-      planJson.textContent = JSON.stringify(planObj, null, 2);
-      planJsonSection.appendChild(planJson);
-      panel.appendChild(planJsonSection);
+
+        const robotIds = Object.keys(robotCallsMap);
+        if (robotIds.length === 0) {
+          const empty = createEl("div", "", {
+            style: { color: "#9ca3af", padding: "8px" }
+          });
+          empty.textContent = "No tool calls";
+          planList.appendChild(empty);
+        } else {
+          robotIds.forEach((robotId, robotIdx) => {
+            const calls = robotCallsMap[robotId];
+            
+            // 机器人标题（只显示一次）
+            const robotHeader = createEl("div", "", {
+              style: {
+                fontWeight: "700",
+                color: "#0b1720",
+                marginBottom: "6px",
+                paddingBottom: "4px",
+                borderBottom: "1px solid #e6eef7"
+              }
+            });
+            robotHeader.textContent = `🤖 ${robotId}`;
+            planList.appendChild(robotHeader);
+
+            // 该机器人的 actions 列表
+            calls.forEach((call, callIdx) => {
+              const callItem = createEl("div", "", {
+                style: {
+                  padding: "4px 6px",
+                  marginLeft: "8px",
+                  marginBottom: callIdx < calls.length - 1 ? "4px" : "0",
+                  background: "#f9fafc",
+                  borderLeft: "2px solid #3b82f6",
+                  borderRadius: "3px",
+                  fontSize: "10px"
+                }
+              });
+
+              const action = createEl("div", "", {
+                style: { color: "#475569", marginBottom: "2px", fontFamily: "'Monaco', 'Courier New', monospace", fontWeight: "600" }
+              });
+              action.textContent = `${call.action}`;
+              callItem.appendChild(action);
+
+              const args = createEl("div", "", {
+                style: { color: "#6b7280", fontFamily: "'Monaco', 'Courier New', monospace", fontSize: "9px", wordBreak: "break-word" }
+              });
+              const argsStr = typeof call.arguments === 'object' 
+                ? JSON.stringify(call.arguments) 
+                : String(call.arguments);
+              args.textContent = argsStr;
+              callItem.appendChild(args);
+
+              planList.appendChild(callItem);
+            });
+
+            // 机器人之间添加间隔
+            if (robotIdx < robotIds.length - 1) {
+              const divider = createEl("div", "", {
+                style: { height: "6px" }
+              });
+              planList.appendChild(divider);
+            }
+          });
+        }
+        rightSection.appendChild(planList);
+      } else {
+        // 查询响应：显示 JSON
+        const planJson = createEl("div", "", {
+          style: {
+            background: "#0b1220",
+            border: "1px solid #1e293b",
+            borderRadius: "6px",
+            padding: "10px",
+            fontSize: "10px",
+            color: "#e6eef8",
+            maxHeight: "150px",
+            overflow: "auto",
+            fontFamily: "'Monaco', 'Courier New', monospace",
+            whiteSpace: "pre-wrap"
+          }
+        });
+
+        const displayObj = {
+          status: this.planData.status,
+          question: this.planData.question || this.planData.instruction,
+          model: this.planData.model
+        };
+
+        planJson.textContent = JSON.stringify(displayObj, null, 2);
+        rightSection.appendChild(planJson);
+      }
+      
+      panel.appendChild(rightSection);
     }
 
     renderMainBody(root) {
@@ -663,7 +822,7 @@
             fontSize: "14px"
           }
         });
-        empty.textContent = "Generate a plan from the task description above or load demo data";
+        empty.textContent = "请在上方描述任务或加载示例数据";
         root.appendChild(empty);
         return;
       }
@@ -672,16 +831,38 @@
         style: {
           flex: "1",
           display: "flex",
+          flexDirection: "column",
           gap: "12px",
           padding: "12px",
-          overflow: "hidden"
+          overflow: "auto"
         }
       });
       root.appendChild(body);
 
-      this.renderPlanningPanel(body);
-      this.renderTimelinePanel(body);
-      this.renderInspectorPanel(body);
+      // 上方：Planning 和 Timeline 并排（占 flex: 1）
+      const topSection = createEl("div", "", {
+        style: {
+          display: "flex",
+          gap: "12px",
+          flex: "1",
+          overflow: "auto",
+          minHeight: "200px"
+        }
+      });
+      body.appendChild(topSection);
+
+      this.renderPlanningPanel(topSection);
+      this.renderTimelinePanel(topSection);
+
+      // 下方：Inspector 固定 300px 高度
+      const inspectorContainer = createEl("div", "", {
+        style: {
+          flex: "0 0 300px",
+          overflow: "auto"
+        }
+      });
+      body.appendChild(inspectorContainer);
+      this.renderInspectorPanel(inspectorContainer);
     }
 
     renderPlanningPanel(body) {
@@ -698,29 +879,57 @@
       });
       body.appendChild(panel);
 
+      let isExpanded = true;
       const header = createEl("div", "", {
         style: {
           padding: "12px",
           borderBottom: "1px solid #e6eef7",
-          background: "#f6f8fa"
+          background: "#f6f8fa",
+          cursor: "pointer",
+          userSelect: "none",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start"
         }
       });
+      
+      const headerLeft = createEl("div", "", {});
       const title = createEl("div", "", {
         style: { fontSize: "13px", fontWeight: "700", color: "#0b1720" }
       });
-      title.textContent = "Planning DAG";
-      header.appendChild(title);
+      title.textContent = "规划视图";
+      headerLeft.appendChild(title);
+      
       const stats = createEl("div", "", {
         style: { fontSize: "11px", color: "#6b7280", marginTop: "4px" }
       });
       const planning = this.planData.llm_global_planning || [];
       const uniqueRobots = new Set(planning.map(t => t.robot_id)).size;
-      stats.textContent = `${planning.length} tasks · ${uniqueRobots} robots`;
-      header.appendChild(stats);
+      stats.textContent = `${planning.length} 个任务 · ${uniqueRobots} 个机器人`;
+      headerLeft.appendChild(stats);
+      header.appendChild(headerLeft);
+
+      const toggleIcon = createEl("span", "", {
+        style: { fontSize: "12px", color: "#666", fontWeight: "bold", minWidth: "12px", marginTop: "2px" }
+      });
+      toggleIcon.textContent = "▼";
+      header.appendChild(toggleIcon);
+
+      header.addEventListener("click", () => {
+        isExpanded = !isExpanded;
+        if (isExpanded) {
+          content.style.display = "flex";
+          toggleIcon.textContent = "▼";
+        } else {
+          content.style.display = "none";
+          toggleIcon.textContent = "▶";
+        }
+      });
+
       panel.appendChild(header);
 
       const content = createEl("div", "", {
-        style: { flex: "1", overflow: "auto", padding: "12px" }
+        style: { flex: "1", overflow: "auto", padding: "12px", display: "flex", flexDirection: "column" }
       });
       const groups = this.getTasksGroupedByOrder();
       const orders = Object.keys(groups).map(Number).sort((a, b) => a - b);
@@ -756,7 +965,7 @@
             }
           });
 
-          const isSelected = this.selectedTaskKey === `${task.robot_id}:${taskIdx}`;
+          const isSelected = this.selectedTaskKey === `${task.robot_id}:${task.task_order}`;
           if (isSelected) {
             card.style.background = "#dfeeff";
             card.style.border = "2px solid #0b66ff";
@@ -770,7 +979,7 @@
           });
 
           card.addEventListener("click", () => {
-            this.selectTask(task.robot_id, taskIdx);
+            this.selectTask(task.robot_id, task.task_order);
             this.render();
           });
 
@@ -828,30 +1037,97 @@
       });
       body.appendChild(panel);
 
+      let isExpanded = true;
       const header = createEl("div", "", {
         style: {
           padding: "12px",
           borderBottom: "1px solid #e6eef7",
-          background: "#f6f8fa"
+          background: "#f6f8fa",
+          cursor: "pointer",
+          userSelect: "none",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start"
         }
       });
+      
+      const headerLeft = createEl("div", "", {});
       const title = createEl("div", "", {
         style: { fontSize: "13px", fontWeight: "700", color: "#0b1720" }
       });
-      title.textContent = "Timeline";
-      header.appendChild(title);
+      title.textContent = "时间线视图";
+      headerLeft.appendChild(title);
+      
       const stats = createEl("div", "", {
         style: { fontSize: "11px", color: "#6b7280", marginTop: "4px" }
       });
       const planning = this.planData.llm_global_planning || [];
       const uniqueRobots = new Set(planning.map(t => t.robot_id)).size;
       const maxOrder = Math.max(0, ...planning.map(t => t.task_order || 0));
-      stats.textContent = `${uniqueRobots} robots · ${maxOrder + 1} phases`;
-      header.appendChild(stats);
+      stats.textContent = `${uniqueRobots} 个机器人 · ${maxOrder + 1} 个阶段`;
+      headerLeft.appendChild(stats);
+      header.appendChild(headerLeft);
+
+      const toggleIcon = createEl("span", "", {
+        style: { fontSize: "12px", color: "#666", fontWeight: "bold", minWidth: "12px", marginTop: "2px" }
+      });
+      toggleIcon.textContent = "▼";
+      header.appendChild(toggleIcon);
+
+      header.addEventListener("click", () => {
+        isExpanded = !isExpanded;
+        if (isExpanded) {
+          legend.style.display = "flex";
+          content.style.display = "flex";
+          toggleIcon.textContent = "▼";
+        } else {
+          legend.style.display = "none";
+          content.style.display = "none";
+          toggleIcon.textContent = "▶";
+        }
+      });
+
       panel.appendChild(header);
 
+      // 添加图例
+      const legend = createEl("div", "", {
+        style: {
+          padding: "8px 12px",
+          background: "#f9fafc",
+          borderBottom: "1px solid #e6eef7",
+          display: "flex",
+          gap: "16px",
+          fontSize: "11px"
+        }
+      });
+      const legendItems = [
+        { status: "pending", label: "待执行", color: "#f3f4f6" },
+        { status: "running", label: "执行中", color: "#eff6ff" },
+        { status: "done", label: "已完成", color: "#ecfdf5" }
+      ];
+      legendItems.forEach(item => {
+        const legendItem = createEl("div", "", {
+          style: { display: "flex", alignItems: "center", gap: "6px" }
+        });
+        const box = createEl("div", "", {
+          style: {
+            width: "16px",
+            height: "16px",
+            borderRadius: "3px",
+            background: item.color,
+            border: "1px solid #d1d5db"
+          }
+        });
+        legendItem.appendChild(box);
+        const text = createEl("span", "", { style: { color: "#6b7280" } });
+        text.textContent = item.label;
+        legendItem.appendChild(text);
+        legend.appendChild(legendItem);
+      });
+      panel.appendChild(legend);
+
       const content = createEl("div", "", {
-        style: { flex: "1", overflow: "auto", padding: "12px" }
+        style: { flex: "1", overflow: "auto", padding: "12px", display: "flex", flexDirection: "column" }
       });
       const timeline = createEl("div", "", { style: { display: "flex", flexDirection: "column", gap: "12px" } });
 
@@ -906,12 +1182,24 @@
 
           const taskInOrder = groups[order].find(t => t.robot_id === robotId);
           if (taskInOrder) {
+            const robotColor = getRobotColor(robotId);
+            
+            // 根据状态选择背景色
+            let bgColor;
+            if (taskInOrder.status === "done") {
+              bgColor = "#ecfdf5"; // 完成：绿色
+            } else if (taskInOrder.status === "running") {
+              bgColor = "#eff6ff"; // 运行中：蓝色
+            } else {
+              bgColor = "#f3f4f6"; // pending：灰色
+            }
+            
             const block = createEl("div", "", {
               style: {
                 width: "95%",
                 padding: "8px",
-                background: "#eff6ff",
-                border: "2px solid #3b82f6",
+                background: bgColor,
+                border: `2px solid ${robotColor.border}`,
                 borderRadius: "6px",
                 cursor: "pointer",
                 textAlign: "center",
@@ -919,35 +1207,32 @@
               }
             });
 
-            const color = getStatusColor(taskInOrder.status);
-            block.style.background = color.bg;
-            block.style.borderColor = color.border;
-
-            const isSelected = this.selectedTaskKey === `${robotId}:${groups[order].indexOf(taskInOrder)}`;
+            const isSelected = this.selectedTaskKey === `${robotId}:${order}`;
             if (isSelected) {
-              block.style.boxShadow = "0 4px 12px rgba(59, 130, 246, 0.3)";
+              block.style.boxShadow = `0 4px 12px ${robotColor.border}80`;
+              block.style.transform = "scale(1.08)";
             }
 
             block.addEventListener("mouseenter", () => {
               if (!isSelected) block.style.transform = "scale(1.05)";
             });
             block.addEventListener("mouseleave", () => {
-              block.style.transform = "";
+              if (!isSelected) block.style.transform = "";
             });
 
             block.addEventListener("click", () => {
-              this.selectTask(robotId, groups[order].indexOf(taskInOrder));
+              this.selectTask(robotId, order);
               this.render();
             });
 
             const blockText = createEl("div", "", {
-              style: { fontSize: "11px", fontWeight: "600", color: color.text }
+              style: { fontSize: "11px", fontWeight: "600", color: robotColor.text }
             });
             blockText.textContent = `O${order}`;
             block.appendChild(blockText);
 
             const summary = createEl("div", "", {
-              style: { fontSize: "10px", color: color.text, marginTop: "2px" }
+              style: { fontSize: "10px", color: robotColor.text, marginTop: "2px" }
             });
             summary.textContent = truncate(taskInOrder.task, 20);
             block.appendChild(summary);
@@ -969,7 +1254,8 @@
     renderInspectorPanel(body) {
       const panel = createEl("div", "", {
         style: {
-          width: "320px",
+          width: "100%",
+          height: "100%",
           background: "#ffffff",
           border: "1px solid #e6eef7",
           borderRadius: "8px",
@@ -980,65 +1266,127 @@
       });
       body.appendChild(panel);
 
+      // 可折叠的标签头
+      let isExpanded = true;
       const header = createEl("div", "", {
         style: {
           padding: "12px",
           borderBottom: "1px solid #e6eef7",
-          background: "#f6f8fa"
+          background: "#f6f8fa",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          cursor: "pointer",
+          userSelect: "none",
+          flexShrink: "0"
         }
       });
+      
+      const titleContainer = createEl("div", "", {
+        style: { display: "flex", alignItems: "center", gap: "8px" }
+      });
+
+      const toggleIcon = createEl("span", "", {
+        style: { fontSize: "12px", color: "#666", fontWeight: "bold", minWidth: "12px" }
+      });
+      toggleIcon.textContent = "▼";
+
       const title = createEl("div", "", {
         style: { fontSize: "13px", fontWeight: "700", color: "#0b1720" }
       });
-      title.textContent = "Inspector";
-      header.appendChild(title);
+      if (this.selectedRobotId && this.selectedTaskOrder !== null) {
+        title.textContent = `详情执行过程 · ${this.selectedRobotId} · Order ${this.selectedTaskOrder}`;
+      } else {
+        title.textContent = "详情执行过程";
+      }
+      
+      titleContainer.appendChild(toggleIcon);
+      titleContainer.appendChild(title);
+      header.appendChild(titleContainer);
       panel.appendChild(header);
 
       const content = createEl("div", "", {
-        style: { flex: "1", overflow: "auto", padding: "12px" }
+        style: { flex: "1", overflow: "auto", padding: "12px", display: "flex", flexDirection: "column" }
       });
 
-      if (!this.selectedRobotId) {
+      header.addEventListener("click", () => {
+        isExpanded = !isExpanded;
+        if (isExpanded) {
+          content.style.display = "flex";
+          toggleIcon.textContent = "▼";
+        } else {
+          content.style.display = "none";
+          toggleIcon.textContent = "▶";
+        }
+      });
+
+      if (!this.selectedRobotId || this.selectedTaskOrder === null) {
         const empty = createEl("div", "", {
           style: { color: "#9ca3af", fontSize: "13px", textAlign: "center", marginTop: "24px" }
         });
-        empty.textContent = "Select a task to inspect";
+        empty.textContent = "选择任务查看详情";
         content.appendChild(empty);
       } else {
         const robotId = this.selectedRobotId;
-        const info = createEl("div", "", {
-          style: { marginBottom: "16px", padding: "10px", background: "#f0f4f8", borderRadius: "6px" }
-        });
+        const taskOrder = this.selectedTaskOrder;
+        const task = this.getTaskByRobotAndOrder(robotId, taskOrder);
 
-        const robotLabel = createEl("div", "", {
-          style: { fontSize: "12px", fontWeight: "700", color: "#0b1720" }
-        });
-        robotLabel.textContent = `Robot: ${robotId}`;
-        info.appendChild(robotLabel);
+        if (task) {
+          const info = createEl("div", "", {
+            style: { marginBottom: "12px", padding: "10px", background: "#f0f4f8", borderRadius: "6px" }
+          });
 
-        const planning = this.planData.llm_global_planning || [];
-        const robotTasks = planning.filter(t => t.robot_id === robotId);
-        if (robotTasks.length > 0) {
-          const current = robotTasks[0];
+          const robotLabel = createEl("div", "", {
+            style: { fontSize: "12px", fontWeight: "700", color: "#0b1720" }
+          });
+          robotLabel.textContent = `🤖 机器人: ${robotId}`;
+          info.appendChild(robotLabel);
+
           const taskText = createEl("div", "", {
             style: { fontSize: "12px", color: "#475569", marginTop: "6px" }
           });
-          taskText.textContent = truncate(current.task, 40);
+          taskText.textContent = `📋 任务: ${task.task}`;
           info.appendChild(taskText);
 
+          if (task.from || task.to) {
+            const location = createEl("div", "", {
+              style: { fontSize: "11px", color: "#6b7280", marginTop: "4px" }
+            });
+            location.textContent = `📍 ${task.from ? "来源: " + task.from : ""}${task.from && task.to ? " → " : ""}${task.to ? "目标: " + task.to : ""}`;
+            info.appendChild(location);
+          }
+
+          if (task.object) {
+            const object = createEl("div", "", {
+              style: { fontSize: "11px", color: "#6b7280", marginTop: "4px" }
+            });
+            object.textContent = `🎯 物体: ${task.object}${task.count ? ` ×${task.count}` : ""}`;
+            info.appendChild(object);
+          }
+
           const status = createEl("div", "", {
-            style: { marginTop: "6px" }
+            style: { marginTop: "8px", display: "flex", alignItems: "center", gap: "8px" }
           });
-          status.appendChild(statusBadge(current.status || "pending"));
+          status.appendChild(statusBadge(task.status || "pending"));
+          
+          // 如果任务正在运行，显示进度提示
+          if (task.status === "running") {
+            const hint = createEl("span", "", {
+              style: { fontSize: "11px", color: "#6b7280" }
+            });
+            hint.textContent = "(执行工具调用中...)";
+            status.appendChild(hint);
+          }
+          
           info.appendChild(status);
+
+          content.appendChild(info);
         }
 
-        content.appendChild(info);
-
         const toolsTitle = createEl("div", "", {
-          style: { fontSize: "12px", fontWeight: "700", color: "#0b1720", marginBottom: "8px" }
+          style: { fontSize: "12px", fontWeight: "700", color: "#0b1720", marginBottom: "8px", marginTop: "4px", flexShrink: "0" }
         });
-        toolsTitle.textContent = "Tool Calls";
+        toolsTitle.textContent = "工具调用";
         content.appendChild(toolsTitle);
 
         const toolCalls = this.getRobotToolCalls(robotId);
@@ -1049,30 +1397,49 @@
           empty.textContent = "No tool calls";
           content.appendChild(empty);
         } else {
+          // 创建水平滚动容器
+          const toolsContainer = createEl("div", "", {
+            style: {
+              display: "flex",
+              gap: "8px",
+              overflow: "auto",
+              paddingRight: "8px",
+              flexShrink: "0",
+              minHeight: "100px"
+            }
+          });
+
           toolCalls.forEach((call, idx) => {
             const callItem = createEl("div", "", {
               style: {
-                padding: "8px",
-                marginBottom: "6px",
+                flex: "0 0 auto",
+                minWidth: "180px",
+                padding: "10px",
                 background: "#f9fafc",
                 border: "1px solid #d1d5db",
-                borderRadius: "6px"
+                borderRadius: "6px",
+                display: "flex",
+                flexDirection: "column"
               }
             });
 
             if (call.status === "running") {
               callItem.style.background = "#eff6ff";
               callItem.style.border = "2px solid #3b82f6";
+              callItem.style.boxShadow = "0 2px 8px rgba(59, 130, 246, 0.2)";
             }
 
             const action = createEl("div", "", {
-              style: { fontSize: "12px", fontWeight: "600", color: "#0b1720" }
+              style: { fontSize: "11px", fontWeight: "600", color: "#0b1720", marginBottom: "4px", wordBreak: "break-word" }
             });
-            action.innerHTML = `${esc(call.action)}<span style="color:#9ca3af; font-weight:400"> (${esc(call.arguments || "")})</span>`;
+            const argsStr = typeof call.arguments === 'object' 
+              ? JSON.stringify(call.arguments).slice(0, 20)
+              : String(call.arguments || "").slice(0, 20);
+            action.innerHTML = `${esc(call.action)}<span style="color:#9ca3af; font-weight:400; fontSize:10px"> (${esc(argsStr)})</span>`;
             callItem.appendChild(action);
 
             const statusBadgeEl = createEl("div", "", {
-              style: { marginTop: "4px" }
+              style: { marginTop: "4px", marginBottom: "4px" }
             });
             statusBadgeEl.appendChild(statusBadge(call.status || "pending"));
             callItem.appendChild(statusBadgeEl);
@@ -1080,23 +1447,24 @@
             if (call.result) {
               const resultBtn = createEl("div", "", {
                 style: {
-                  fontSize: "11px",
+                  fontSize: "10px",
                   color: "#0b66ff",
-                  marginTop: "4px",
-                  cursor: "pointer"
+                  cursor: "pointer",
+                  marginTop: "auto"
                 }
               });
               resultBtn.textContent = "View Result";
               resultBtn.addEventListener("click", () => {
                 const detail = createEl("pre", "", {
                   style: {
-                    fontSize: "10px",
+                    fontSize: "9px",
                     background: "#0b1220",
                     color: "#e6eef8",
-                    padding: "6px",
+                    padding: "4px",
                     borderRadius: "4px",
                     marginTop: "4px",
-                    overflow: "auto"
+                    overflow: "auto",
+                    maxHeight: "80px"
                   }
                 });
                 detail.textContent = JSON.stringify(call.result, null, 2);
@@ -1111,8 +1479,10 @@
               callItem.appendChild(resultBtn);
             }
 
-            content.appendChild(callItem);
+            toolsContainer.appendChild(callItem);
           });
+
+          content.appendChild(toolsContainer);
         }
       }
 

@@ -1,0 +1,357 @@
+{
+  "robot_behaviors": {
+    "wheel_robot": {
+      "category": "轮式机器人",
+      "examples": ["WR-GYL-0001", "WR-SZZX-0001"],
+      "capabilities": {
+        "navigation": {
+          "move_to": {
+            "description": "移动到指定地点",
+            "parameters": {
+              "target_location": {
+                "type": "string",
+                "description": "目标位置（pickup_area, dropoff_area, zone_a, zone_b等）"
+              },
+              "speed": {
+                "type": "number",
+                "default": 1.0,
+                "description": "移动速度（0-1，相对值）"
+              }
+            },
+            "expected_duration_ms": 5000,
+            "failure_modes": ["path_blocked", "gps_lost", "battery_low"]
+          },
+          "return_to_charger": {
+            "description": "返回充电器位置",
+            "parameters": {},
+            "expected_duration_ms": 10000,
+            "failure_modes": ["charger_not_found", "battery_critical"]
+          }
+        },
+        "manipulation": {
+          "grasp": {
+            "description": "抓取物体",
+            "parameters": {
+              "target_object": {
+                "type": "string",
+                "description": "目标物体名称或ID"
+              },
+              "grasp_force": {
+                "type": "number",
+                "default": 0.5,
+                "description": "抓取力度（0-1）"
+              }
+            },
+            "expected_duration_ms": 2000,
+            "failure_modes": ["object_not_found", "grasp_failed", "gripper_error"]
+          },
+          "release": {
+            "description": "释放物体",
+            "parameters": {
+              "target_location": {
+                "type": "string",
+                "description": "释放位置"
+              }
+            },
+            "expected_duration_ms": 1000,
+            "failure_modes": ["release_failed"]
+          },
+          "stack_boxes": {
+            "description": "堆垛箱子（仓储机器人特有）",
+            "parameters": {
+              "source_zone": {
+                "type": "string",
+                "description": "源区域"
+              },
+              "target_zone": {
+                "type": "string",
+                "description": "目标区域"
+              },
+              "num_boxes": {
+                "type": "integer",
+                "description": "堆垛数量"
+              },
+              "stack_height": {
+                "type": "integer",
+                "description": "堆垛高度（层数）"
+              }
+            },
+            "expected_duration_ms": 15000,
+            "failure_modes": ["stack_unstable", "boxes_unavailable", "zone_blocked"]
+          }
+        },
+        "sensing": {
+          "take_photo": {
+            "description": "拍照",
+            "parameters": {
+              "target": {
+                "type": "string",
+                "description": "拍照目标"
+              }
+            },
+            "expected_duration_ms": 1000,
+            "failure_modes": ["camera_error", "low_light"]
+          },
+          "scan_area": {
+            "description": "扫描区域（目录清单）",
+            "parameters": {
+              "area_name": {
+                "type": "string",
+                "description": "区域名称"
+              },
+              "scan_mode": {
+                "type": "string",
+                "enum": ["quick", "detailed", "360"],
+                "description": "扫描模式"
+              }
+            },
+            "expected_duration_ms": 10000,
+            "failure_modes": ["scan_incomplete", "vision_error"]
+          }
+        },
+        "communication": {
+          "speak": {
+            "description": "语音播报",
+            "parameters": {
+              "message": {
+                "type": "string",
+                "description": "播报内容"
+              },
+              "volume": {
+                "type": "number",
+                "default": 0.8,
+                "description": "音量（0-1）"
+              }
+            },
+            "expected_duration_ms": 3000,
+            "failure_modes": ["speaker_error", "language_not_supported"]
+          }
+        }
+      }
+    },
+    "quadruped_robot": {
+      "category": "四足机器人",
+      "examples": ["QR-SZZX-0001"],
+      "capabilities": {
+        "navigation": {
+          "move_to": {
+            "description": "移动到指定地点（支持复杂地形）",
+            "parameters": {
+              "target_location": {
+                "type": "string"
+              },
+              "gait": {
+                "type": "string",
+                "enum": ["walk", "trot", "run"],
+                "default": "trot",
+                "description": "步伐类型"
+              }
+            },
+            "expected_duration_ms": 8000,
+            "failure_modes": ["terrain_impassable", "gait_unstable", "obstacle_detected"]
+          },
+          "climb": {
+            "description": "爬升（楼梯、斜坡等）",
+            "parameters": {
+              "target_height": {
+                "type": "number",
+                "description": "目标高度（米）"
+              },
+              "climb_angle": {
+                "type": "number",
+                "description": "爬升角度（度）"
+              }
+            },
+            "expected_duration_ms": 10000,
+            "failure_modes": ["slope_too_steep", "traction_lost"]
+          }
+        },
+        "sensing": {
+          "inspect": {
+            "description": "巡检（视觉+热成像）",
+            "parameters": {
+              "inspection_type": {
+                "type": "string",
+                "enum": ["visual", "thermal", "combined"],
+                "description": "巡检类型"
+              },
+              "area": {
+                "type": "string",
+                "description": "巡检区域"
+              }
+            },
+            "expected_duration_ms": 30000,
+            "failure_modes": ["camera_malfunction", "poor_visibility"]
+          },
+          "voice_communication": {
+            "description": "语音对讲",
+            "parameters": {
+              "direction": {
+                "type": "string",
+                "description": "对讲方向（双向）"
+              }
+            },
+            "expected_duration_ms": 0,
+            "failure_modes": ["network_disconnected"]
+          }
+        }
+      }
+    },
+    "drone": {
+      "category": "无人机",
+      "examples": ["DR-WX-0001"],
+      "capabilities": {
+        "navigation": {
+          "takeoff": {
+            "description": "起飞",
+            "parameters": {
+              "altitude": {
+                "type": "number",
+                "default": 5.0,
+                "description": "起飞高度（米）"
+              }
+            },
+            "expected_duration_ms": 5000,
+            "failure_modes": ["gps_not_ready", "battery_low", "wind_too_strong"]
+          },
+          "fly_to": {
+            "description": "飞行到指定坐标",
+            "parameters": {
+              "latitude": {"type": "number"},
+              "longitude": {"type": "number"},
+              "altitude": {
+                "type": "number",
+                "default": 50.0,
+                "description": "飞行高度（米）"
+              },
+              "speed": {
+                "type": "number",
+                "default": 10.0,
+                "description": "飞行速度（m/s）"
+              }
+            },
+            "expected_duration_ms": 20000,
+            "failure_modes": ["gps_loss", "wind_detected", "no_fly_zone"]
+          },
+          "land": {
+            "description": "着陆",
+            "parameters": {
+              "landing_zone": {
+                "type": "string",
+                "description": "着陆区域"
+              }
+            },
+            "expected_duration_ms": 10000,
+            "failure_modes": ["landing_zone_blocked", "gps_unstable"]
+          }
+        },
+        "sensing": {
+          "survey": {
+            "description": "航线任务调查",
+            "parameters": {
+              "area": {
+                "type": "string",
+                "description": "调查区域"
+              },
+              "altitude": {
+                "type": "number",
+                "description": "任务高度（米）"
+              },
+              "overlap": {
+                "type": "number",
+                "default": 0.8,
+                "description": "影像重叠率"
+              }
+            },
+            "expected_duration_ms": 60000,
+            "failure_modes": ["rtk_error", "weather_unfavorable", "storage_full"]
+          },
+          "capture_video": {
+            "description": "4K视频录制",
+            "parameters": {
+              "duration": {
+                "type": "integer",
+                "description": "录制时长（秒）"
+              }
+            },
+            "expected_duration_ms": 0,
+            "failure_modes": ["storage_full", "gimbal_error"]
+          }
+        }
+      }
+    },
+    "humanoid_robot": {
+      "category": "通用机器人",
+      "examples": ["10041B700128"],
+      "capabilities": {
+        "navigation": {
+          "walk_to": {
+            "description": "行走到指定位置",
+            "parameters": {
+              "target_location": {
+                "type": "string"
+              },
+              "speed": {
+                "type": "number",
+                "default": 1.0,
+                "description": "行走速度"
+              }
+            },
+            "expected_duration_ms": 10000,
+            "failure_modes": ["balance_lost", "obstacle", "battery_low"]
+          }
+        },
+        "manipulation": {
+          "pick_and_place": {
+            "description": "拾取并放置物体",
+            "parameters": {
+              "object": {"type": "string"},
+              "from_location": {"type": "string"},
+              "to_location": {"type": "string"}
+            },
+            "expected_duration_ms": 10000,
+            "failure_modes": ["object_too_heavy", "motion_error"]
+          }
+        },
+        "interaction": {
+          "gesture": {
+            "description": "执行手势",
+            "parameters": {
+              "gesture_type": {
+                "type": "string",
+                "enum": ["wave", "point", "thumbs_up", "salute"]
+              }
+            },
+            "expected_duration_ms": 2000,
+            "failure_modes": ["actuator_error"]
+          }
+        }
+      }
+    }
+  },
+  "common_task_patterns": {
+    "inspection_workflow": {
+      "description": "巡检工作流",
+      "steps": ["navigate_to_area", "scan_area", "take_photos", "return_to_base"],
+      "suitable_robots": ["wheel_robot", "quadruped_robot", "drone"]
+    },
+    "transport_workflow": {
+      "description": "运输工作流",
+      "steps": ["navigate_to_pickup", "grasp_object", "navigate_to_dropoff", "release_object"],
+      "suitable_robots": ["wheel_robot", "humanoid_robot"]
+    },
+    "stacking_workflow": {
+      "description": "堆垛工作流",
+      "steps": ["navigate_to_source", "scan_source", "grasp_box", "transport", "stack", "return"],
+      "suitable_robots": ["wheel_robot"]
+    }
+  },
+  "intent_keywords": {
+    "navigation": ["移动", "前往", "去", "到达", "go", "move", "navigate"],
+    "inspection": ["巡检", "检查", "查看", "扫描", "inspect", "check", "survey"],
+    "transport": ["搬运", "运输", "送", "拿", "transport", "carry", "deliver"],
+    "manipulation": ["抓取", "堆垛", "放置", "grasp", "stack", "place"],
+    "information": ["查询", "告诉我", "是什么", "多少", "query", "what", "how many"],
+    "status": ["状态", "电量", "位置", "在哪", "status", "battery", "location"]
+  }
+}

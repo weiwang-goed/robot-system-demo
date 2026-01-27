@@ -388,6 +388,10 @@ setInterval(() => {
 // ===================== HTTP server =====================
 const app = express();
 
+// 配置中间件：解析 JSON 请求体
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
 // 静态托管前端（保持你原来方式不变）
 app.use(express.static(path.join(__dirname, ""))); //robot_console_dashboard_modular
 
@@ -558,23 +562,41 @@ app.post("/api/tasks", async (req, res) => {
 });
 
 // ===== [新增] FastAPI 代理路由 =====
-// 将 POST /api/generate_plan 转发到 FastAPI 后端（端口 9000）
-const FASTAPI_URL = process.env.FASTAPI_URL || "http://127.0.0.1:9000";
+// 将 POST /api/generate_plan 转发到 FastAPI 后端（端口 8000）
+const FASTAPI_URL = process.env.FASTAPI_URL || "http://127.0.0.1:8000";
 
 app.post("/api/generate_plan", async (req, res) => {
   try {
     const payload = req.body; // { instruction, site }
     
+    console.log("[PROXY] /api/generate_plan 被调用");
+    console.log("[PROXY] 请求体类型:", typeof payload, "值:", JSON.stringify(payload));
+    
+    // 验证请求体
+    if (!payload) {
+      console.error("[PROXY] 错误：payload 为 null/undefined");
+      return res.status(400).json({ error: "Request body is empty" });
+    }
+    
     // 转发请求到 FastAPI
     const urlObj = new URL("/api/generate_plan", FASTAPI_URL);
+    const payloadStr = JSON.stringify(payload);
+    
+    console.log("[PROXY] 转发到:", urlObj.toString());
+    console.log("[PROXY] 负载长度:", payloadStr.length);
+    
     const options = {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(payloadStr)
       },
     };
 
-    const proxyReq = https.request(urlObj, options, (proxyRes) => {
+    // 选择合适的模块（http 或 https），不要总是用 https.request
+    const transport = urlObj.protocol === "https:" ? https : http;
+
+    const proxyReq = transport.request(urlObj, options, (proxyRes) => {
       let data = "";
       proxyRes.on("data", (chunk) => {
         data += chunk;
@@ -582,22 +604,24 @@ app.post("/api/generate_plan", async (req, res) => {
       proxyRes.on("end", () => {
         try {
           const result = JSON.parse(data);
+          console.log("[PROXY] 收到响应，状态码:", proxyRes.statusCode);
           res.status(proxyRes.statusCode || 200).json(result);
         } catch (parseErr) {
+          console.error("[PROXY] 解析响应失败:", parseErr.message);
           res.status(500).json({ error: "Failed to parse FastAPI response" });
         }
       });
     });
 
     proxyReq.on("error", (err) => {
-      console.error("FastAPI proxy error:", err.message);
+      console.error("[PROXY] 请求错误:", err.message);
       res.status(503).json({ error: "FastAPI backend unavailable", detail: err.message });
     });
 
-    proxyReq.write(JSON.stringify(payload));
+    proxyReq.write(payloadStr);
     proxyReq.end();
   } catch (e) {
-    console.error("POST /api/generate_plan proxy error:", e);
+    console.error("[PROXY] 异常:", e);
     res.status(500).json({ error: e.message || String(e) });
   }
 });

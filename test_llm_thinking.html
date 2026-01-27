@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM Thinking Process Preview</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #f5f7fa;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            margin-bottom: 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #0b1720;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .info {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .panel {
+            background: #f6f8fa;
+            border-bottom: 1px solid #e6eef7;
+            padding: 12px 20px;
+            display: flex;
+            gap: 16px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .section {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .section-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: #0b1720;
+            margin-bottom: 8px;
+        }
+
+        .section-content {
+            background: #ffffff;
+            border: 1px solid #e6eef7;
+            border-radius: 6px;
+            padding: 10px;
+            font-size: 11px;
+            color: #475569;
+            line-height: 1.6;
+            max-height: 350px;
+            overflow: auto;
+            font-family: 'Monaco', 'Courier New', monospace;
+        }
+
+        .section-content-dark {
+            background: #0b1220;
+            border: 1px solid #1e293b;
+            color: #e6eef8;
+        }
+
+        .json-display {
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .badge-information {
+            background: #dbeafe;
+            color: #0c2340;
+            border: 1px solid #0284c7;
+        }
+
+        .badge-planning {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #059669;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            padding: 8px 16px;
+            background: #0b66ff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 12px;
+        }
+
+        button:hover {
+            background: #0052cc;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            font-size: 12px;
+        }
+
+        .status-success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #059669;
+        }
+
+        .status-error {
+            background: #fee2e2;
+            color: #7f1d1d;
+            border: 1px solid #dc2626;
+        }
+
+        .status-loading {
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #f59e0b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 LLM Thinking Process Preview</h1>
+            <p class="info">测试前端是否能正确显示 demo_run.json 的内容</p>
+        </div>
+
+        <div class="controls">
+            <button onclick="loadFromFile()">📂 Load demo_run.json</button>
+            <button onclick="loadSampleData('information')">📋 Load Sample Information</button>
+            <button onclick="loadSampleData('planning')">🚀 Load Sample Planning</button>
+        </div>
+
+        <div id="status"></div>
+        <div id="panel"></div>
+    </div>
+
+    <script>
+        function esc(s = "") {
+            return String(s ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+        }
+
+        function createEl(tag = "div", cls = "", attrs = {}) {
+            const el = document.createElement(tag);
+            if (cls) el.className = cls;
+            for (const [k, v] of Object.entries(attrs)) {
+                if (k === "style" && typeof v === "object") Object.assign(el.style, v);
+                else el.setAttribute(k, String(v));
+            }
+            return el;
+        }
+
+        function renderPanel(planData) {
+            const panelEl = document.getElementById('panel');
+            panelEl.innerHTML = '';
+
+            if (!planData) {
+                const empty = createEl('div');
+                empty.textContent = '❌ No data loaded';
+                panelEl.appendChild(empty);
+                return;
+            }
+
+            const panel = createEl("div", "", {
+                style: {
+                    background: "#f6f8fa",
+                    borderBottom: "1px solid #e6eef7",
+                    padding: "12px 20px",
+                    maxHeight: "400px",
+                    overflow: "hidden",
+                    display: "flex",
+                    gap: "16px",
+                    borderRadius: "8px"
+                }
+            });
+            panelEl.appendChild(panel);
+
+            // 判断响应类型
+            const isInformation = planData.type === "information";
+            const isQuery = planData.answer && planData.status === "ANSWERED";
+
+            const leftSection = createEl("div", "", { style: { flex: "1", minWidth: "0" } });
+            const leftTitle = createEl("div", "", {
+                style: { fontSize: "12px", fontWeight: "700", color: "#0b1720", marginBottom: "8px" }
+            });
+
+            // 显示类型徽章
+            const badge = createEl('span', '', { style: { marginRight: '8px' } });
+            if (isInformation || isQuery) {
+                badge.innerHTML = '<span class="badge badge-information">📋 INFORMATION</span>';
+                leftTitle.innerHTML = badge.innerHTML + ' Query Response';
+            } else {
+                badge.innerHTML = '<span class="badge badge-planning">🚀 PLANNING</span>';
+                leftTitle.innerHTML = badge.innerHTML + ' LLM Thinking Process';
+            }
+            leftSection.appendChild(leftTitle);
+
+            const queryContent = createEl("div", "", {
+                style: {
+                    background: "#ffffff",
+                    border: "1px solid #e6eef7",
+                    borderRadius: "6px",
+                    padding: "10px",
+                    fontSize: "11px",
+                    color: "#475569",
+                    lineHeight: "1.6",
+                    maxHeight: "350px",
+                    overflow: "auto",
+                    fontFamily: "'Monaco', 'Courier New', monospace"
+                }
+            });
+
+            if (isInformation || isQuery) {
+                // 查询响应
+                const queryDisplay = `问题 (Question):\n${planData.question || planData.instruction || "N/A"}\n\n` +
+                    `状态 (Status):\n${planData.status || "ANSWERED"}\n\n` +
+                    `答案 (Answer):\n${planData.answer || "No answer provided"}\n\n` +
+                    `模型 (Model):\n${planData.model || "unknown"}\n\n` +
+                    `来源 (Sources):\n${JSON.stringify(planData.sources || [], null, 2)}`;
+                queryContent.textContent = queryDisplay;
+            } else {
+                // 任务规划
+                queryContent.textContent = planData.llm_thinking || "思考过程...";
+            }
+            leftSection.appendChild(queryContent);
+            panel.appendChild(leftSection);
+
+            const rightSection = createEl("div", "", { style: { flex: "1", minWidth: "0" } });
+            const rightTitle = createEl("div", "", {
+                style: { fontSize: "12px", fontWeight: "700", color: "#0b1720", marginBottom: "8px" }
+            });
+
+            if (isInformation || isQuery) {
+                rightTitle.textContent = "📊 Full Response (JSON)";
+            } else {
+                rightTitle.textContent = "📊 Generated Plan (JSON)";
+            }
+            rightSection.appendChild(rightTitle);
+
+            const planJson = createEl("div", "", {
+                style: {
+                    background: "#0b1220",
+                    border: "1px solid #1e293b",
+                    borderRadius: "6px",
+                    padding: "10px",
+                    fontSize: "10px",
+                    color: "#e6eef8",
+                    maxHeight: "350px",
+                    overflow: "auto",
+                    fontFamily: "'Monaco', 'Courier New', monospace",
+                    whiteSpace: "pre-wrap"
+                }
+            });
+
+            let displayObj = {};
+            if (isInformation || isQuery) {
+                displayObj = {
+                    type: planData.type,
+                    status: planData.status,
+                    question: planData.question || planData.instruction,
+                    answer: planData.answer,
+                    model: planData.model,
+                    sources: planData.sources,
+                    timestamp: planData.timestamp
+                };
+            } else {
+                displayObj = {
+                    run_id: planData.run_id,
+                    status: planData.status,
+                    task_type: planData.task_type,
+                    instruction: planData.instruction,
+                    llm_global_planning: planData.llm_global_planning,
+                    robot_tool_calls: planData.robot_tool_calls,
+                    constraints: planData.constraints,
+                    estimated_duration_ms: planData.estimated_duration_ms
+                };
+            }
+
+            planJson.textContent = JSON.stringify(displayObj, null, 2);
+            rightSection.appendChild(planJson);
+            panel.appendChild(rightSection);
+        }
+
+        function setStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status');
+            statusEl.innerHTML = '';
+            const status = createEl('div', '', { style: { padding: '10px 20px', borderRadius: '6px', marginBottom: '10px' } });
+            status.className = 'status status-' + type;
+            status.textContent = message;
+            statusEl.appendChild(status);
+        }
+
+        async function loadFromFile() {
+            try {
+                setStatus('⏳ Loading demo_run.json...', 'loading');
+                const response = await fetch('/data/demo_run.json');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                renderPanel(data);
+                setStatus(`✓ Loaded successfully! Type: ${data.type || 'unknown'}`, 'success');
+            } catch (e) {
+                setStatus(`✗ Error: ${e.message}`, 'error');
+            }
+        }
+
+        function loadSampleData(type) {
+            try {
+                let data;
+                if (type === 'information') {
+                    data = {
+                        "type": "information",
+                        "status": "ANSWERED",
+                        "question": "现在有几个机器人",
+                        "answer": "现在有一个机器人，具体信息如下：仓储管理机器人001（型号AGIBOT-A2W），状态为ONLINE，位于深圳观澜仓库，当前执行的任务是'3号仓库日常盘点'。",
+                        "sources": ["robot_status", "llm_response"],
+                        "model": "ernie-4.5-21b-a3b-thinking",
+                        "timestamp": new Date().toISOString()
+                    };
+                } else {
+                    data = {
+                        "type": "planning",
+                        "run_id": "run_1234567890",
+                        "status": "PLANNING",
+                        "task_type": "inspect",
+                        "instruction": "巡视一区进行视频拍摄",
+                        "llm_thinking": "用户要求巡视一区并进行视频拍摄。首先需要分析一区的位置和可用机器人的能力。根据robots.json数据，仓储管理机器人001位于深圳观澜仓库，具有视频拍摄能力。该机器人当前状态为ONLINE。\n\n任务分解：\n1. 导航到一区的各个检查点\n2. 在每个检查点进行视频拍摄\n3. 记录拍摄时间和位置\n4. 返回基地\n\n预计耗时：45分钟",
+                        "llm_global_planning": [
+                            {
+                                "task_order": 0,
+                                "robot_id": "robot-001",
+                                "task": "navigate_to_area_1",
+                                "description": "导航到一区的起点"
+                            },
+                            {
+                                "task_order": 1,
+                                "robot_id": "robot-001",
+                                "task": "video_record",
+                                "description": "在一区进行完整的视频拍摄"
+                            },
+                            {
+                                "task_order": 2,
+                                "robot_id": "robot-001",
+                                "task": "return_to_base",
+                                "description": "返回基地停靠"
+                            }
+                        ],
+                        "robot_tool_calls": {
+                            "robot-001": [
+                                {
+                                    "action": "navigate",
+                                    "arguments": "area_1_checkpoint_1",
+                                    "status": "pending"
+                                },
+                                {
+                                    "action": "start_video",
+                                    "arguments": "high_quality_1080p",
+                                    "status": "pending"
+                                },
+                                {
+                                    "action": "navigate",
+                                    "arguments": "area_1_checkpoint_2",
+                                    "status": "pending"
+                                },
+                                {
+                                    "action": "stop_video",
+                                    "arguments": "save_video",
+                                    "status": "pending"
+                                }
+                            ]
+                        },
+                        "constraints": ["Only use available robots", "Complete within 1 hour", "Ensure safety"],
+                        "estimated_duration_ms": 2700000,
+                        "timestamp": new Date().toISOString()
+                    };
+                }
+                renderPanel(data);
+                setStatus(`✓ Loaded sample ${type} data!`, 'success');
+            } catch (e) {
+                setStatus(`✗ Error: ${e.message}`, 'error');
+            }
+        }
+
+        // 页面加载时自动尝试加载
+        document.addEventListener('DOMContentLoaded', () => {
+            loadFromFile();
+        });
+    </script>
+</body>
+</html>
