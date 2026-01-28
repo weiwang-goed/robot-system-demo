@@ -311,6 +311,23 @@
     .flex1 {
       flex: 1;
     }
+
+    .battery-ring-container {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: default;
+    }
+    .battery-ring-container svg {
+      transition: all 0.3s ease;
+    }
+    .battery-ring-container:hover svg {
+      transform: scale(1.1);
+    }
+    .battery-ring-container circle {
+      transition: stroke 0.3s ease;
+    }
+
     @media (max-width: 1100px) {
       .content{grid-template-columns: 1fr}
       .sidebar{display:none}
