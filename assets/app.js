@@ -171,7 +171,7 @@ function renderRows(list) {
         <td><span class="mono">${escapeHtml(r.model || "—")}</span></td>
         <td class="mono">${escapeHtml(r.ip || "—")}</td>
         <td>${escapeHtml(r.site || "—")}</td>
-        <td>${Number.isFinite(r.battery) ? `${r.battery}%` : "—"}</td>
+        <td>${Number.isFinite(r.battery) ? batteryRing(r.battery) : "—"}</td>
         <td>${escapeHtml(r.task || "—")}</td>
         <td>${escapeHtml(r.lastSeen || "—")}</td>
         <td style="text-align:right;">
@@ -309,6 +309,61 @@ async function refresh() {
       "刷新失败： 读取数据有误"
     );
   }
+}
+
+function batteryRing(percentage) {
+  // 确定颜色
+  let color = "#10b981"; // 绿色
+  if (percentage < 20) color = "#ef4444"; // 红色
+  else if (percentage < 40) color = "#f59e0b"; // 黄色
+  
+  // 计算圆环参数
+  const size = 36; // SVG大小
+  const strokeWidth = 3;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (percentage / 100) * circumference;
+  
+  return `
+    <div class="battery-ring-container" title="${percentage}%">
+      <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+        <!-- 背景圆环 -->
+        <circle
+          cx="${size/2}"
+          cy="${size/2}"
+          r="${radius}"
+          fill="none"
+          stroke="#e5e7eb"
+          stroke-width="${strokeWidth}"
+        />
+        <!-- 进度圆环 -->
+        <circle
+          cx="${size/2}"
+          cy="${size/2}"
+          r="${radius}"
+          fill="none"
+          stroke="${color}"
+          stroke-width="${strokeWidth}"
+          stroke-dasharray="${circumference}"
+          stroke-dashoffset="${strokeDashoffset}"
+          stroke-linecap="round"
+          transform="rotate(-90 ${size/2} ${size/2})"
+        />
+        <!-- 百分比文字 -->
+        <text
+          x="50%"
+          y="50%"
+          text-anchor="middle"
+          dy="0.3em"
+          font-size="10"
+          font-weight="600"
+          fill="${color}"
+        >
+          ${Math.round(percentage)}%
+        </text>
+      </svg>
+    </div>
+  `;
 }
 
 // ---- 小工具：避免 XSS/属性注入（原型也建议保留） ----
