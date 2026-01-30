@@ -28,6 +28,7 @@ import re
 from dotenv import load_dotenv
 from openai import OpenAI
 from task_templates_core import get_template_engine
+from execution_supervisor import SupervisedExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +109,7 @@ class BaiduPlanner:
         self.planning_enable_thinking = os.getenv("PLANNING_ENABLE_THINKING", "true").lower() == "true"
         
         self.template_engine = get_template_engine()
+        self.executor = SupervisedExecutor(template_engine=self.template_engine)
         
         logger.info("初始化百度千帆 Planner，已集成任务模板系统")
         logger.info(f"意图识别模型: {self.intent_model}")
@@ -370,7 +372,7 @@ class BaiduPlanner:
             # 如果模板匹配且置信度较高，直接使用模板生成的计划
             if matched and confidence > 0.5:
                 logger.info(f"使用 LLM 匹配的模板 '{template_name}' 生成任务计划")
-                return {
+                payload = {
                     "run_id": f"run_{int(__import__('time').time() * 1000)}",
                     "status": "PLANNING",
                     "task_type": intent.primary_action,
@@ -384,6 +386,8 @@ class BaiduPlanner:
                     "robot_tool_calls": template_result.get("robot_tool_calls", {}),
                     "constraints": template_result.get("constraints", [])
                 }
+                payload["execution_supervision"] = self.executor.preview(payload, instruction)
+                return payload
             
             # 第二步：如果模板不匹配或置信度低，使用高性能 LLM 直接生成
             logger.info(f"模板匹配置信度不足或未匹配，使用 {self.planning_model} 直接生成任务计划")
@@ -510,7 +514,7 @@ class BaiduPlanner:
             plan = self._parse_json_response(response_text)
             logger.info(f"解析的规划数据: {json.dumps(plan, ensure_ascii=False)[:200]}")
             
-            return {
+            payload = {
                 "run_id": f"run_{int(__import__('time').time() * 1000)}",
                 "status": "PLANNING",
                 "task_type": intent.primary_action,
@@ -522,6 +526,8 @@ class BaiduPlanner:
                 "parameters": plan.get("parameters", {}),
                 "constraints": plan.get("constraints", [])
             }
+            payload["execution_supervision"] = self.executor.preview(payload, instruction)
+            return payload
         
         except Exception as e:
             logger.error(f"LLM 任务规划生成失败: {e}", exc_info=True)

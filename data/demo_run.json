@@ -1,11 +1,230 @@
 {
-  "type": "information",
-  "status": "ANSWERED",
-  "question": "目前有几台机器人",
-  "answer": "目前有1台机器人，名为“仓储管理机器人001”，位于深圳观澜仓库，正在执行“3号仓库日常盘点”任务。",
-  "sources": [
-    "robot_status",
-    "llm_response"
+  "run_id": "run_1769744282232",
+  "status": "PLANNING",
+  "task_type": "general",
+  "instruction": "通知李涛, 刘松来2201开会",
+  "timestamp": "2026-01-30T11:38:02.232352Z",
+  "model": "llm-template-matching",
+  "template_used": "notification",
+  "template_confidence": 0.95,
+  "params": {
+    "recipients": [
+      "李涛",
+      "刘松"
+    ],
+    "location": "2201",
+    "reason": "开会"
+  },
+  "llm_global_planning": [
+    {
+      "task_order": 0,
+      "robot_id": "QR-SZZX-0001",
+      "task": "通知任务",
+      "description": "通知 李涛, 刘松 到 2201 开会"
+    }
   ],
-  "model": "qwen3-8b"
+  "robot_tool_calls": {
+    "QR-SZZX-0001": [
+      {
+        "action": "search_people",
+        "arguments": {
+          "targets": [
+            "李涛",
+            "刘松"
+          ],
+          "stop_when_all_found": true,
+          "sweep_strategy": {
+            "preferred_route": [
+              "2201"
+            ],
+            "max_loops": 1
+          }
+        },
+        "metadata": {
+          "adaptive": true,
+          "reason": "移动过程中同步感知，找到所有目标后提前终止剩余路线",
+          "call_index": 0
+        },
+        "status": "pending",
+        "step_id": "QR-SZZX-0001-00-search_people"
+      },
+      {
+        "action": "return_to_location",
+        "arguments": {
+          "location": "2201",
+          "reason": "通知结束后返回会议室等候"
+        },
+        "status": "pending",
+        "step_id": "QR-SZZX-0001-01-return_to_location"
+      },
+      {
+        "action": "speech_synthesis",
+        "arguments": {
+          "recipients": [
+            "李涛",
+            "刘松"
+          ],
+          "location": "2201",
+          "message": "请李涛,刘松到2201开会"
+        },
+        "status": "pending",
+        "step_id": "QR-SZZX-0001-02-speech_synthesis"
+      }
+    ]
+  },
+  "constraints": [
+    "匹配模板 notification",
+    "参数由 LLM 按注册表提取"
+  ],
+  "execution_supervision": {
+    "steps": [
+      {
+        "step_id": "QR-SZZX-0001-00-search_people",
+        "robot_id": "QR-SZZX-0001",
+        "action": "search_people",
+        "arguments": {
+          "targets": [
+            "李涛",
+            "刘松"
+          ],
+          "stop_when_all_found": true,
+          "sweep_strategy": {
+            "preferred_route": [
+              "2201"
+            ],
+            "max_loops": 1
+          }
+        },
+        "timeout_sec": 45,
+        "retriable": true,
+        "metadata": {
+          "adaptive": true,
+          "reason": "移动过程中同步感知，找到所有目标后提前终止剩余路线",
+          "call_index": 0
+        },
+        "status": "pending"
+      },
+      {
+        "step_id": "QR-SZZX-0001-01-return_to_location",
+        "robot_id": "QR-SZZX-0001",
+        "action": "return_to_location",
+        "arguments": {
+          "location": "2201",
+          "reason": "通知结束后返回会议室等候"
+        },
+        "timeout_sec": 45,
+        "retriable": true,
+        "metadata": {
+          "call_index": 1
+        },
+        "status": "pending"
+      },
+      {
+        "step_id": "QR-SZZX-0001-02-speech_synthesis",
+        "robot_id": "QR-SZZX-0001",
+        "action": "speech_synthesis",
+        "arguments": {
+          "recipients": [
+            "李涛",
+            "刘松"
+          ],
+          "location": "2201",
+          "message": "请李涛,刘松到2201开会"
+        },
+        "timeout_sec": 45,
+        "retriable": true,
+        "metadata": {
+          "call_index": 2
+        },
+        "status": "pending"
+      }
+    ],
+    "supervision_rules": {
+      "timeout_behavior": "cancel-current-and-request-replan",
+      "abort_signal": "operator_stop",
+      "max_retries": 1,
+      "description": "顺序执行命令，若失败/超时/终止则立即停止并触发重新规划"
+    },
+    "adaptive_search": [
+      {
+        "step_id": "QR-SZZX-0001-00-search_people",
+        "robot_id": "QR-SZZX-0001",
+        "targets": [
+          "李涛",
+          "刘松"
+        ],
+        "found_targets": [],
+        "stop_when_all_found": true,
+        "waypoints": [
+          "2201"
+        ],
+        "note": "移动过程中同步感知，找到所有目标后提前终止剩余路线"
+      }
+    ],
+    "events": [],
+    "replan_decisions": [],
+    "next_actions": [
+      {
+        "step_id": "QR-SZZX-0001-00-search_people",
+        "robot_id": "QR-SZZX-0001",
+        "action": "search_people",
+        "arguments": {
+          "targets": [
+            "李涛",
+            "刘松"
+          ],
+          "stop_when_all_found": true,
+          "sweep_strategy": {
+            "preferred_route": [
+              "2201"
+            ],
+            "max_loops": 1
+          }
+        },
+        "timeout_sec": 45,
+        "retriable": true,
+        "metadata": {
+          "adaptive": true,
+          "reason": "移动过程中同步感知，找到所有目标后提前终止剩余路线",
+          "call_index": 0
+        },
+        "status": "pending"
+      },
+      {
+        "step_id": "QR-SZZX-0001-01-return_to_location",
+        "robot_id": "QR-SZZX-0001",
+        "action": "return_to_location",
+        "arguments": {
+          "location": "2201",
+          "reason": "通知结束后返回会议室等候"
+        },
+        "timeout_sec": 45,
+        "retriable": true,
+        "metadata": {
+          "call_index": 1
+        },
+        "status": "pending"
+      },
+      {
+        "step_id": "QR-SZZX-0001-02-speech_synthesis",
+        "robot_id": "QR-SZZX-0001",
+        "action": "speech_synthesis",
+        "arguments": {
+          "recipients": [
+            "李涛",
+            "刘松"
+          ],
+          "location": "2201",
+          "message": "请李涛,刘松到2201开会"
+        },
+        "timeout_sec": 45,
+        "retriable": true,
+        "metadata": {
+          "call_index": 2
+        },
+        "status": "pending"
+      }
+    ],
+    "instruction": "通知李涛, 刘松来2201开会"
+  }
 }

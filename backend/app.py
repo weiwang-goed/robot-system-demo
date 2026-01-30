@@ -31,6 +31,21 @@ if PLANNER_TYPE == "baidu":
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+class _SuppressPathFilter(logging.Filter):
+    """Suppress noisy access log entries for specific request paths."""
+
+    def __init__(self, *paths: str):
+        super().__init__()
+        self._paths = tuple(paths)
+
+    def filter(self, record: logging.LogRecord) -> bool:  # noqa: D401
+        message = record.getMessage()
+        return not any(f'"GET {path} ' in message for path in self._paths)
+
+
+logging.getLogger("uvicorn.access").addFilter(_SuppressPathFilter("/agv/getState"))
+
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 DEMO_PATH = DATA_DIR / "demo_run.json"

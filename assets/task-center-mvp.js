@@ -71,6 +71,29 @@
     return el;
   }
 
+  function createAdaptiveChip(label, state = "pending") {
+    const palette = {
+      pending: { bg: "#f3f4f6", border: "#d1d5db", text: "#374151" },
+      done: { bg: "#ecfdf5", border: "#34d399", text: "#065f46" }
+    };
+    const colors = palette[state] || palette.pending;
+    const chip = createEl("span", "", {
+      style: {
+        display: "inline-flex",
+        alignItems: "center",
+        padding: "2px 10px",
+        borderRadius: "999px",
+        fontSize: "11px",
+        fontWeight: "600",
+        border: `1px solid ${colors.border}`,
+        background: colors.bg,
+        color: colors.text
+      }
+    });
+    chip.textContent = label;
+    return chip;
+  }
+
   function statusBadge(status) {
     const color = getStatusColor(status);
     const badge = createEl("span", "", {
@@ -839,20 +862,18 @@
       });
       root.appendChild(body);
 
-      // 上方：Planning 和 Timeline 并排（占 flex: 1）
-      const topSection = createEl("div", "", {
+      // 上方：仅保留时间线视图
+      const timelineSection = createEl("div", "", {
         style: {
           display: "flex",
-          gap: "12px",
           flex: "1",
           overflow: "auto",
           minHeight: "200px"
         }
       });
-      body.appendChild(topSection);
+      body.appendChild(timelineSection);
 
-      this.renderPlanningPanel(topSection);
-      this.renderTimelinePanel(topSection);
+      this.renderTimelinePanel(timelineSection);
 
       // 下方：Inspector 固定 300px 高度
       const inspectorContainer = createEl("div", "", {
@@ -863,164 +884,6 @@
       });
       body.appendChild(inspectorContainer);
       this.renderInspectorPanel(inspectorContainer);
-    }
-
-    renderPlanningPanel(body) {
-      const panel = createEl("div", "", {
-        style: {
-          width: "280px",
-          background: "#ffffff",
-          border: "1px solid #e6eef7",
-          borderRadius: "8px",
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden"
-        }
-      });
-      body.appendChild(panel);
-
-      let isExpanded = true;
-      const header = createEl("div", "", {
-        style: {
-          padding: "12px",
-          borderBottom: "1px solid #e6eef7",
-          background: "#f6f8fa",
-          cursor: "pointer",
-          userSelect: "none",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start"
-        }
-      });
-      
-      const headerLeft = createEl("div", "", {});
-      const title = createEl("div", "", {
-        style: { fontSize: "13px", fontWeight: "700", color: "#0b1720" }
-      });
-      title.textContent = "规划视图";
-      headerLeft.appendChild(title);
-      
-      const stats = createEl("div", "", {
-        style: { fontSize: "11px", color: "#6b7280", marginTop: "4px" }
-      });
-      const planning = this.planData.llm_global_planning || [];
-      const uniqueRobots = new Set(planning.map(t => t.robot_id)).size;
-      stats.textContent = `${planning.length} 个任务 · ${uniqueRobots} 个机器人`;
-      headerLeft.appendChild(stats);
-      header.appendChild(headerLeft);
-
-      const toggleIcon = createEl("span", "", {
-        style: { fontSize: "12px", color: "#666", fontWeight: "bold", minWidth: "12px", marginTop: "2px" }
-      });
-      toggleIcon.textContent = "▼";
-      header.appendChild(toggleIcon);
-
-      header.addEventListener("click", () => {
-        isExpanded = !isExpanded;
-        if (isExpanded) {
-          content.style.display = "flex";
-          toggleIcon.textContent = "▼";
-        } else {
-          content.style.display = "none";
-          toggleIcon.textContent = "▶";
-        }
-      });
-
-      panel.appendChild(header);
-
-      const content = createEl("div", "", {
-        style: { flex: "1", overflow: "auto", padding: "12px", display: "flex", flexDirection: "column" }
-      });
-      const groups = this.getTasksGroupedByOrder();
-      const orders = Object.keys(groups).map(Number).sort((a, b) => a - b);
-
-      orders.forEach((order, idx) => {
-        const group = groups[order];
-        const orderGroup = createEl("div", "", { style: { marginBottom: "16px" } });
-
-        const orderLabel = createEl("div", "", {
-          style: {
-            fontSize: "12px",
-            fontWeight: "700",
-            color: "#0b1720",
-            marginBottom: "8px",
-            padding: "6px 8px",
-            background: "#eff8ff",
-            borderRadius: "6px"
-          }
-        });
-        orderLabel.textContent = `Order ${order}`;
-        orderGroup.appendChild(orderLabel);
-
-        group.forEach((task, taskIdx) => {
-          const card = createEl("div", "", {
-            style: {
-              padding: "8px",
-              marginBottom: "6px",
-              background: "#f9fafc",
-              border: "1px solid #d1d5db",
-              borderRadius: "6px",
-              cursor: "pointer",
-              transition: "all 150ms ease"
-            }
-          });
-
-          const isSelected = this.selectedTaskKey === `${task.robot_id}:${task.task_order}`;
-          if (isSelected) {
-            card.style.background = "#dfeeff";
-            card.style.border = "2px solid #0b66ff";
-          }
-
-          card.addEventListener("mouseenter", () => {
-            if (!isSelected) card.style.background = "#f0f4f8";
-          });
-          card.addEventListener("mouseleave", () => {
-            if (!isSelected) card.style.background = "#f9fafc";
-          });
-
-          card.addEventListener("click", () => {
-            this.selectTask(task.robot_id, task.task_order);
-            this.render();
-          });
-
-          const robotLabel = createEl("div", "", {
-            style: { fontSize: "11px", fontWeight: "700", color: "#0b1720" }
-          });
-          robotLabel.textContent = task.robot_id;
-          card.appendChild(robotLabel);
-
-          const taskText = createEl("div", "", {
-            style: { fontSize: "12px", color: "#475569", marginTop: "4px", lineHeight: "1.3" }
-          });
-          taskText.textContent = truncate(task.task, 35);
-          card.appendChild(taskText);
-
-          const statusRow = createEl("div", "", {
-            style: { marginTop: "6px", display: "flex", justifyContent: "space-between", alignItems: "center" }
-          });
-          statusRow.appendChild(statusBadge(task.status || "pending"));
-          card.appendChild(statusRow);
-
-          orderGroup.appendChild(card);
-        });
-
-        content.appendChild(orderGroup);
-
-        if (idx < orders.length - 1) {
-          const arrow = createEl("div", "", {
-            style: {
-              textAlign: "center",
-              color: "#cbd5e1",
-              marginBottom: "12px",
-              fontSize: "16px"
-            }
-          });
-          arrow.textContent = "↓";
-          content.appendChild(arrow);
-        }
-      });
-
-      panel.appendChild(content);
     }
 
     renderTimelinePanel(body) {
@@ -1161,14 +1024,18 @@
             display: "flex",
             gap: "8px",
             alignItems: "center",
-            minHeight: "48px"
+            minHeight: "48px",
+            overflowX: "auto",
+            paddingBottom: "4px"
           }
         });
 
-        orders.forEach((order, orderIdx) => {
+        orders.forEach(order => {
           const phase = createEl("div", "", {
             style: {
-              flex: `${1 + order * 0.5}`,
+              flex: "0 0 200px",
+              maxWidth: "220px",
+              minWidth: "150px",
               position: "relative",
               minHeight: "48px",
               background: "#f9fafc",
@@ -1248,6 +1115,80 @@
       });
 
       content.appendChild(timeline);
+
+      const supervision = this.planData.execution_supervision;
+      if (supervision && Array.isArray(supervision.steps) && supervision.steps.length > 0) {
+        const supHeader = createEl("div", "", {
+          style: { marginTop: "16px", fontSize: "12px", fontWeight: "700", color: "#0b1720" }
+        });
+        supHeader.textContent = "指令监督与回退";
+        content.appendChild(supHeader);
+
+        const supList = createEl("div", "", {
+          style: {
+            marginTop: "8px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "6px"
+          }
+        });
+
+        supervision.steps.forEach(step => {
+          const row = createEl("div", "", {
+            style: {
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: "8px",
+              background: "#f9fafc",
+              border: "1px solid #e2e8f0",
+              borderRadius: "6px",
+              fontSize: "11px"
+            }
+          });
+
+          const left = createEl("div", "", {
+            style: { display: "flex", flexDirection: "column", gap: "4px" }
+          });
+
+          const statusWrap = createEl("div", "", { style: { display: "flex", gap: "6px", alignItems: "center" } });
+          statusWrap.appendChild(statusBadge(step.status || "pending"));
+          const title = createEl("span", "", { style: { fontWeight: "600", color: "#0b1720" } });
+          title.textContent = `${step.robot_id} · ${step.action}`;
+          statusWrap.appendChild(title);
+          left.appendChild(statusWrap);
+
+          const meta = createEl("div", "", { style: { color: "#6b7280" } });
+          meta.textContent = `timeout ${step.timeout_sec}s · retriable: ${step.retriable ? "是" : "否"}`;
+          left.appendChild(meta);
+
+          if (step.metadata?.reason) {
+            const hint = createEl("div", "", { style: { color: "#9ca3af" } });
+            hint.textContent = step.metadata.reason;
+            left.appendChild(hint);
+          }
+
+          row.appendChild(left);
+
+          const right = createEl("div", "", { style: { textAlign: "right", color: "#94a3b8" } });
+          right.textContent = step.step_id;
+          row.appendChild(right);
+
+          supList.appendChild(row);
+        });
+
+        const ruleHint = createEl("div", "", {
+          style: {
+            fontSize: "11px",
+            color: "#475569",
+            marginTop: "4px"
+          }
+        });
+        ruleHint.textContent = supervision.supervision_rules?.description || "顺序执行并在失败时重规划";
+        supList.appendChild(ruleHint);
+        content.appendChild(supList);
+      }
+
       panel.appendChild(content);
     }
 
@@ -1443,6 +1384,46 @@
             });
             statusBadgeEl.appendChild(statusBadge(call.status || "pending"));
             callItem.appendChild(statusBadgeEl);
+
+            const stepId = call.step_id || call.metadata?.step_id;
+            const adaptiveInfo = this.planData.execution_supervision?.adaptive_search?.find?.(
+              search => search.step_id === stepId
+            );
+            if (adaptiveInfo) {
+              const adaptiveBox = createEl("div", "", {
+                style: {
+                  marginTop: "6px",
+                  padding: "6px",
+                  background: "#ecfdf5",
+                  border: "1px dashed #34d399",
+                  borderRadius: "6px"
+                }
+              });
+              const adaptiveTitle = createEl("div", "", {
+                style: { fontSize: "10px", fontWeight: "700", color: "#065f46", marginBottom: "4px" }
+              });
+              adaptiveTitle.textContent = "多目标感知";
+              adaptiveBox.appendChild(adaptiveTitle);
+
+              const chipWrap = createEl("div", "", {
+                style: { display: "flex", flexWrap: "wrap", gap: "4px" }
+              });
+              (adaptiveInfo.targets || []).forEach(target => {
+                const done = (adaptiveInfo.found_targets || []).includes(target);
+                chipWrap.appendChild(createAdaptiveChip(target, done ? "done" : "pending"));
+              });
+              adaptiveBox.appendChild(chipWrap);
+
+              if (Array.isArray(adaptiveInfo.waypoints) && adaptiveInfo.waypoints.length > 0) {
+                const route = createEl("div", "", {
+                  style: { marginTop: "4px", fontSize: "10px", color: "#0f5132" }
+                });
+                route.textContent = `路线: ${adaptiveInfo.waypoints.join(" → ")}`;
+                adaptiveBox.appendChild(route);
+              }
+
+              callItem.appendChild(adaptiveBox);
+            }
 
             if (call.result) {
               const resultBtn = createEl("div", "", {
