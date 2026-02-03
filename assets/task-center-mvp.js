@@ -313,9 +313,6 @@
 
       this.renderTopBar(root);
       this.renderInteractionPanel(root);
-      if (this.planData) {
-        this.renderLLMThinkingPanel(root);
-      }
       this.renderMainBody(root);
     }
 
@@ -603,20 +600,59 @@
     renderLLMThinkingPanel(root) {
       const panel = createEl("div", "", {
         style: {
-          background: "#f6f8fa",
-          borderBottom: "1px solid #e6eef7",
-          padding: "12px 20px",
-          maxHeight: "200px",
+          flex: "0 0 auto",
+          width: "100%",
+          background: "#ffffff",
+          border: "1px solid #e6eef7",
+          borderRadius: "8px",
           overflow: "hidden",
           display: "flex",
-          gap: "16px"
+          flexDirection: "column"
         }
       });
       root.appendChild(panel);
 
+      // Collapsible header similar to Inspector
+      let isExpanded = true;
+      const header = createEl("div", "", {
+        style: {
+          padding: "12px",
+          borderBottom: "1px solid #e6eef7",
+          background: "#f6f8fa",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          cursor: "pointer",
+          userSelect: "none",
+          flexShrink: "0"
+        }
+      });
+      const titleContainer = createEl("div", "", { style: { display: "flex", alignItems: "center", gap: "8px" } });
+      const toggleIcon = createEl("span", "", { style: { fontSize: "12px", color: "#666", fontWeight: "bold", minWidth: "12px" } });
+      toggleIcon.textContent = "▼";
+
       // 判断响应类型：查询（information）还是规划（planning/task）
       const isInformation = this.planData.type === "information";
       const isQuery = this.planData.answer && this.planData.status === "ANSWERED";
+      const headerTitle = createEl("div", "", { style: { fontSize: "13px", fontWeight: "700", color: "#0b1720" } });
+      headerTitle.textContent = (isInformation || isQuery) ? "查询结果" : "LLM任务规划";
+      titleContainer.appendChild(toggleIcon);
+      titleContainer.appendChild(headerTitle);
+      header.appendChild(titleContainer);
+      panel.appendChild(header);
+
+      const contentWrap = createEl("div", "", { style: { display: "flex", gap: "16px", padding: "12px" } });
+      panel.appendChild(contentWrap);
+      header.addEventListener("click", () => {
+        isExpanded = !isExpanded;
+        if (isExpanded) {
+          contentWrap.style.display = "flex";
+          toggleIcon.textContent = "▼";
+        } else {
+          contentWrap.style.display = "none";
+          toggleIcon.textContent = "▶";
+        }
+      });
 
       const leftSection = createEl("div", "", { style: { flex: "1" } });
       const leftTitle = createEl("div", "", {
@@ -637,8 +673,6 @@
             fontSize: "11px",
             color: "#475569",
             lineHeight: "1.6",
-            maxHeight: "150px",
-            overflow: "auto",
             fontFamily: "'Monaco', 'Courier New', monospace"
           }
         });
@@ -651,7 +685,7 @@
 
         queryContent.textContent = queryDisplay;
         leftSection.appendChild(queryContent);
-        panel.appendChild(leftSection);
+        contentWrap.appendChild(leftSection);
 
       } else {
         // === 任务规划类型 ===
@@ -667,8 +701,6 @@
             fontSize: "11px",
             color: "#475569",
             lineHeight: "1.5",
-            maxHeight: "150px",
-            overflow: "auto",
             fontFamily: "'Monaco', 'Courier New', monospace",
             whiteSpace: "pre-wrap",
             wordBreak: "break-word"
@@ -684,7 +716,7 @@
         
         thinkingContent.textContent = thinkingDisplay;
         leftSection.appendChild(thinkingContent);
-        panel.appendChild(leftSection);
+        contentWrap.appendChild(leftSection);
       }
 
       const rightSection = createEl("div", "", { style: { flex: "1" } });
@@ -708,9 +740,7 @@
             borderRadius: "6px",
             padding: "8px",
             fontSize: "11px",
-            color: "#475569",
-            maxHeight: "150px",
-            overflow: "auto"
+            color: "#475569"
           }
         });
 
@@ -808,8 +838,6 @@
             padding: "10px",
             fontSize: "10px",
             color: "#e6eef8",
-            maxHeight: "150px",
-            overflow: "auto",
             fontFamily: "'Monaco', 'Courier New', monospace",
             whiteSpace: "pre-wrap"
           }
@@ -824,8 +852,8 @@
         planJson.textContent = JSON.stringify(displayObj, null, 2);
         rightSection.appendChild(planJson);
       }
-      
-      panel.appendChild(rightSection);
+
+      contentWrap.appendChild(rightSection);
     }
 
     renderMainBody(root) {
@@ -857,24 +885,27 @@
       });
       root.appendChild(body);
 
-      // 上方：仅保留时间线视图
+      // First section: LLM 任务规划（与其它同级）
+      if (this.planData) {
+        this.renderLLMThinkingPanel(body);
+      }
+
+      // 第二：时间线视图
       const timelineSection = createEl("div", "", {
         style: {
           display: "flex",
-          flex: "1",
-          overflow: "auto",
-          minHeight: "200px"
+          flex: "0 0 auto"
         }
       });
       body.appendChild(timelineSection);
 
       this.renderTimelinePanel(timelineSection);
 
-      // 下方：Inspector 固定 300px 高度
+      // 第三：详情执行过程（默认固定高度，折叠时释放空间）
       const inspectorContainer = createEl("div", "", {
         style: {
           flex: "0 0 300px",
-          overflow: "auto"
+          
         }
       });
       body.appendChild(inspectorContainer);
@@ -884,7 +915,8 @@
     renderTimelinePanel(body) {
       const panel = createEl("div", "", {
         style: {
-          flex: "1",
+          flex: "0 0 auto",
+          width: "100%",
           background: "#ffffff",
           border: "1px solid #e6eef7",
           borderRadius: "8px",
@@ -985,7 +1017,7 @@
       panel.appendChild(legend);
 
       const content = createEl("div", "", {
-        style: { flex: "1", overflow: "auto", padding: "12px", display: "flex", flexDirection: "column" }
+        style: { flex: "1", padding: "12px", display: "flex", flexDirection: "column" }
       });
       const timeline = createEl("div", "", { style: { display: "flex", flexDirection: "column", gap: "12px" } });
 
@@ -1242,7 +1274,7 @@
       panel.appendChild(header);
 
       const content = createEl("div", "", {
-        style: { flex: "1", overflow: "auto", padding: "12px", display: "flex", flexDirection: "column" }
+        style: { flex: "1", padding: "12px", display: "flex", flexDirection: "column" }
       });
 
       header.addEventListener("click", () => {
@@ -1250,9 +1282,13 @@
         if (isExpanded) {
           content.style.display = "flex";
           toggleIcon.textContent = "▼";
+          // Expand: restore reserved height
+          body.style.flex = "0 0 300px";
         } else {
           content.style.display = "none";
           toggleIcon.textContent = "▶";
+          // Collapse: free space for other controls
+          body.style.flex = "0 0 auto";
         }
       });
 
