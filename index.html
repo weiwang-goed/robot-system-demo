@@ -34,9 +34,9 @@
           <span>地图与区域</span>
           <span class="meta">站点</span>
         </a>
-        <a href="#" onclick="return false;">
-          <span>告警</span>
-          <span class="meta">规则</span>
+        <a href="#" onclick="showTab('digital-twin'); return false;">
+          <span>数字孪生</span>
+          <span class="meta">3D · 模拟</span>
         </a>
         <a href="#" onclick="return false;">
           <span>固件 & 配置</span>
@@ -81,6 +81,40 @@
 
       <section id="robo-control" class="flex1" style="display:none; padding:12px;">
         <!-- robo-control.js 将渲染到这里 -->
+      </section>
+
+      <section id="digital-twin" class="flex1" style="display:none;">
+        <div class="twin-toolbar">
+          <div class="twin-field">
+            <span class="label">站点</span>
+            <select id="twin-site">
+              <option value="">全部站点</option>
+            </select>
+          </div>
+        </div>
+        <div class="twin-container">
+          <div class="twin-panel left-panel">
+            <div class="twin-header">
+              <h3>数字孪生模型</h3>
+              <button class="collapse-btn" onclick="toggleTwinPanel('left')" title="折叠/展开">←</button>
+            </div>
+            <div class="twin-content">
+              <iframe id="twin-left-iframe" src="" frameborder="0" style="width:100%; height:100%;"></iframe>
+            </div>
+          </div>
+          
+          <div class="twin-divider" id="twin-divider" onmousedown="startResizing(event)"></div>
+          
+          <div class="twin-panel right-panel">
+            <div class="twin-header">
+              <button class="collapse-btn" onclick="toggleTwinPanel('right')" title="折叠/展开">→</button>
+              <h3>实时检测</h3>
+            </div>
+            <div class="twin-content">
+              <iframe id="twin-right-iframe" src="" frameborder="0" style="width:100%; height:100%;"></iframe>
+            </div>
+          </div>
+        </div>
       </section>
 
       <section id="main-dashbord" style="">

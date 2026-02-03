@@ -1,16 +1,16 @@
 {
-  "run_id": "run_1769744282232",
+  "run_id": "run_1770018558162",
   "status": "PLANNING",
   "task_type": "general",
-  "instruction": "通知李涛, 刘松来2201开会",
-  "timestamp": "2026-01-30T11:38:02.232352Z",
+  "instruction": "让张三，李四来2201开会",
+  "timestamp": "2026-02-02T15:49:18.162680Z",
   "model": "llm-template-matching",
   "template_used": "notification",
   "template_confidence": 0.95,
   "params": {
     "recipients": [
-      "李涛",
-      "刘松"
+      "张三",
+      "李四"
     ],
     "location": "2201",
     "reason": "开会"
@@ -20,7 +20,7 @@
       "task_order": 0,
       "robot_id": "QR-SZZX-0001",
       "task": "通知任务",
-      "description": "通知 李涛, 刘松 到 2201 开会"
+      "description": "通知 张三, 李四 到 2201 开会"
     }
   ],
   "robot_tool_calls": {
@@ -29,8 +29,8 @@
         "action": "search_people",
         "arguments": {
           "targets": [
-            "李涛",
-            "刘松"
+            "张三",
+            "李四"
           ],
           "stop_when_all_found": true,
           "sweep_strategy": {
@@ -61,11 +61,11 @@
         "action": "speech_synthesis",
         "arguments": {
           "recipients": [
-            "李涛",
-            "刘松"
+            "张三",
+            "李四"
           ],
           "location": "2201",
-          "message": "请李涛,刘松到2201开会"
+          "message": "请张三,李四到2201开会"
         },
         "status": "pending",
         "step_id": "QR-SZZX-0001-02-speech_synthesis"
@@ -84,8 +84,8 @@
         "action": "search_people",
         "arguments": {
           "targets": [
-            "李涛",
-            "刘松"
+            "张三",
+            "李四"
           ],
           "stop_when_all_found": true,
           "sweep_strategy": {
@@ -125,11 +125,11 @@
         "action": "speech_synthesis",
         "arguments": {
           "recipients": [
-            "李涛",
-            "刘松"
+            "张三",
+            "李四"
           ],
           "location": "2201",
-          "message": "请李涛,刘松到2201开会"
+          "message": "请张三,李四到2201开会"
         },
         "timeout_sec": 45,
         "retriable": true,
@@ -150,8 +150,8 @@
         "step_id": "QR-SZZX-0001-00-search_people",
         "robot_id": "QR-SZZX-0001",
         "targets": [
-          "李涛",
-          "刘松"
+          "张三",
+          "李四"
         ],
         "found_targets": [],
         "stop_when_all_found": true,
@@ -170,8 +170,8 @@
         "action": "search_people",
         "arguments": {
           "targets": [
-            "李涛",
-            "刘松"
+            "张三",
+            "李四"
           ],
           "stop_when_all_found": true,
           "sweep_strategy": {
@@ -211,11 +211,11 @@
         "action": "speech_synthesis",
         "arguments": {
           "recipients": [
-            "李涛",
-            "刘松"
+            "张三",
+            "李四"
           ],
           "location": "2201",
-          "message": "请李涛,刘松到2201开会"
+          "message": "请张三,李四到2201开会"
         },
         "timeout_sec": 45,
         "retriable": true,
@@ -225,6 +225,6 @@
         "status": "pending"
       }
     ],
-    "instruction": "通知李涛, 刘松来2201开会"
+    "instruction": "让张三，李四来2201开会"
   }
 }

@@ -167,12 +167,7 @@
       this.planning = {};
       if (this.planData) {
         this.parseData();
-        if (this.planData.llm_global_planning && this.planData.llm_global_planning.length > 0) {
-          const firstRobot = this.planData.llm_global_planning[0].robot_id;
-          const firstOrder = this.planData.llm_global_planning[0].task_order || 0;
-          this.selectedRobotId = firstRobot;
-          this.selectedTaskOrder = firstOrder;
-        }
+        // 不再自动选择第一个任务，用户需要手动点击查看详情
       }
     }
 

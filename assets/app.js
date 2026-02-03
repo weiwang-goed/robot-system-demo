@@ -2,6 +2,9 @@
 
 let robots = [];
 let selectedId = null;
+let twinLeftCollapsed = false;
+let twinRightCollapsed = false;
+let twinDividerPos = 50; // 默认50%
 
 // Add: ensure showTab exists so index.html onclick won't throw
 window.showTab = function (tabId) {
@@ -12,11 +15,13 @@ window.showTab = function (tabId) {
 
   const dbEl = document.getElementById("main-dashbord");
   const roboCtrEl = document.getElementById("robo-control");
+  const twinEl = document.getElementById("digital-twin");
 
   if (tabId === "task-center") {
     if (taskEl) taskEl.style.display = "block";
     if (dbEl) dbEl.style.display = "none";
     if (roboCtrEl) roboCtrEl.style.display = "none";
+    if (twinEl) twinEl.style.display = "none";
     // if (filtersEl) filtersEl.style.display = "none";
     // if (contentEl) contentEl.style.display = "none";
     // If task-center renderer is available, call it
@@ -28,9 +33,15 @@ window.showTab = function (tabId) {
 
     if (taskEl) taskEl.style.display = "none";
     if (dbEl) dbEl.style.display = "none";
+    if (twinEl) twinEl.style.display = "none";
     // if (statsEl) statsEl.style.display = "none";
     // if (filtersEl) filtersEl.style.display = "none";
     // if (contentEl) contentEl.style.display = "none";
+  } else if (tabId === "digital-twin") {
+    if (twinEl) twinEl.style.display = "";
+    if (taskEl) taskEl.style.display = "none";
+    if (dbEl) dbEl.style.display = "none";
+    if (roboCtrEl) roboCtrEl.style.display = "none";
   }
   else {
     // show main dashboard
@@ -40,6 +51,7 @@ window.showTab = function (tabId) {
     // if (contentEl) contentEl.style.display = "";
     if (dbEl) dbEl.style.display = "";
     if (roboCtrEl) roboCtrEl.style.display = "none";
+    if (twinEl) twinEl.style.display = "none";
   }
 }
 
@@ -74,6 +86,16 @@ function initFilters() {
   modelEl.innerHTML =
     `<option value="">全部型号</option>` +
     models.map((m) => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join("");
+}
+
+function initTwinSites() {
+  const siteEl = document.getElementById("twin-site");
+  if (!siteEl) return;
+
+  const sites = uniqueSorted(robots.map((r) => r.site).filter(Boolean));
+  siteEl.innerHTML =
+    `<option value="">全部站点</option>` +
+    sites.map((s) => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
 }
 
 function computeStats(list) {
@@ -302,6 +324,7 @@ async function refresh() {
   try {
     await loadRobots();
     initFilters();
+    initTwinSites();
     render();
   } catch (e) {
     console.error(e);
@@ -365,6 +388,92 @@ function batteryRing(percentage) {
     </div>
   `;
 }
+
+
+// ---- 数字孪生面板控制 ----
+window.toggleTwinPanel = function (side) {
+  const leftPanel = document.querySelector('.left-panel');
+  const rightPanel = document.querySelector('.right-panel');
+  const divider = document.getElementById('twin-divider');
+
+  if (side === 'left') {
+    twinLeftCollapsed = !twinLeftCollapsed;
+    leftPanel.classList.toggle('collapsed', twinLeftCollapsed);
+  } else {
+    twinRightCollapsed = !twinRightCollapsed;
+    rightPanel.classList.toggle('collapsed', twinRightCollapsed);
+  }
+
+  updateTwinLayout();
+};
+
+function updateTwinLayout() {
+  const leftPanel = document.querySelector('.left-panel');
+  const rightPanel = document.querySelector('.right-panel');
+  const divider = document.getElementById('twin-divider');
+  const leftBtn = leftPanel?.querySelector('.collapse-btn');
+  const rightBtn = rightPanel?.querySelector('.collapse-btn');
+
+  if (leftBtn) leftBtn.textContent = twinLeftCollapsed ? '→' : '←';
+  if (rightBtn) rightBtn.textContent = twinRightCollapsed ? '←' : '→';
+
+  if (twinLeftCollapsed && twinRightCollapsed) {
+    divider.style.display = 'none';
+    leftPanel.style.flex = '0 0 44px';
+    rightPanel.style.flex = '0 0 44px';
+    return;
+  }
+
+  if (twinLeftCollapsed) {
+    divider.style.display = 'none';
+    leftPanel.style.flex = '0 0 44px';
+    rightPanel.style.flex = '1';
+    return;
+  }
+
+  if (twinRightCollapsed) {
+    divider.style.display = 'none';
+    rightPanel.style.flex = '0 0 44px';
+    leftPanel.style.flex = '1';
+    return;
+  }
+
+  divider.style.display = '';
+  updateTwinPanelSizes();
+}
+
+function updateTwinPanelSizes() {
+  const leftPanel = document.querySelector('.left-panel');
+  const rightPanel = document.querySelector('.right-panel');
+
+  leftPanel.style.flex = `${twinDividerPos}`;
+  rightPanel.style.flex = `${100 - twinDividerPos}`;
+}
+
+window.startResizing = function (e) {
+  e.preventDefault();
+  const container = document.querySelector('.twin-container');
+  const divider = document.getElementById('twin-divider');
+  
+  function handleMouseMove(moveEvent) {
+    const rect = container.getBoundingClientRect();
+    const newPos = ((moveEvent.clientX - rect.left) / rect.width) * 100;
+    
+    // 限制最小宽度，防止panel过小
+    if (newPos > 20 && newPos < 80) {
+      twinDividerPos = newPos;
+      updateTwinPanelSizes();
+    }
+  }
+  
+  function handleMouseUp() {
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', handleMouseUp);
+  }
+  
+  document.addEventListener('mousemove', handleMouseMove);
+  document.addEventListener('mouseup', handleMouseUp);
+};
 
 // ---- 小工具：避免 XSS/属性注入（原型也建议保留） ----
 function escapeHtml(s) {
