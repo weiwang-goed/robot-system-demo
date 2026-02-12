@@ -25,7 +25,7 @@ const MQTT_PORT = process.env.MQTT_PORT || "11883";      // MQTT broker
 const MQTT_TOPIC = process.env.MQTT_TOPIC || "/Vehicle_11/vehicle_state";       // 订阅的 topic
 const CONNECT_TIMEOUT_MS = Number(process.env.CONNECT_TIMEOUT_MS || 10000);
 
-const PORT = process.env.PORT || 8000;
+const PORT = process.env.PORT || 7001;
 const OFFLINE_MS = Number(process.env.OFFLINE_MS || 30_000); // 30 秒没心跳就判离线（可调）
 
 // ===== [新增] roster 路径 + HTTP 轮询参数 =====
@@ -414,6 +414,104 @@ app.get("/api/robots", (req, res) => {
   res.json([...robotMap.values()].map(({ _ts, statusUrl, ...rest }) => rest));
 });
 
+
+
+app.post("/api/test_speech_only", (req, res) => {
+  // 1. 构造目标 URL
+  const urlObj = new URL("/api/test_speech_only", FASTAPI_URL); // FASTAPI_URL 在文件顶部定义了
+  const payload = req.body;
+  const payloadStr = JSON.stringify(payload);
+
+  console.log("[PROXY] 转发语音测试请求到:", urlObj.toString());
+
+  const options = {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Content-Length": Buffer.byteLength(payloadStr)
+    },
+  };
+
+  // 2. 发起转发请求
+  const transport = urlObj.protocol === "https:" ? https : http;
+  const proxyReq = transport.request(urlObj, options, (proxyRes) => {
+    let data = "";
+    proxyRes.on("data", (chunk) => { data += chunk; });
+    proxyRes.on("end", () => {
+      try {
+        // 尝试解析 JSON
+        const result = JSON.parse(data);
+        console.log("[PROXY] 语音测试响应码:", proxyRes.statusCode);
+        res.status(proxyRes.statusCode || 200).json(result);
+      } catch (e) {
+        // 如果后端报错返回的不是JSON，直接返回原文
+        res.status(proxyRes.statusCode || 500).json({ raw: data });
+      }
+    });
+  });
+
+  proxyReq.on("error", (err) => {
+    console.error("[PROXY] 请求 FastAPI 失败:", err.message);
+    res.status(502).json({ error: "Backend unavailable" });
+  });
+
+  // 3. 写入数据
+  proxyReq.write(payloadStr);
+  proxyReq.end();
+});
+
+
+
+
+
+// ===== [新增] 全功能执行接口转发 =====
+app.post("/api/execute_plan", (req, res) => {
+  // 1. 构造目标 URL
+  const urlObj = new URL("/api/execute_plan", FASTAPI_URL);
+  const payload = req.body;
+  const payloadStr = JSON.stringify(payload);
+
+  console.log("[PROXY] 转发全功能执行请求到:", urlObj.toString());
+
+  const options = {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Content-Length": Buffer.byteLength(payloadStr)
+    },
+  };
+
+  // 2. 发起转发请求
+  const transport = urlObj.protocol === "https:" ? https : http;
+  const proxyReq = transport.request(urlObj, options, (proxyRes) => {
+    let data = "";
+    proxyRes.on("data", (chunk) => { data += chunk; });
+    proxyRes.on("end", () => {
+      try {
+        const result = JSON.parse(data);
+        console.log("[PROXY] 执行响应码:", proxyRes.statusCode);
+        res.status(proxyRes.statusCode || 200).json(result);
+      } catch (e) {
+        res.status(proxyRes.statusCode || 500).json({ raw: data });
+      }
+    });
+  });
+
+  proxyReq.on("error", (err) => {
+    console.error("[PROXY] 请求 FastAPI 失败:", err.message);
+    res.status(502).json({ error: "Backend unavailable" });
+  });
+
+  // 3. 写入数据
+  proxyReq.write(payloadStr);
+  proxyReq.end();
+});
+
+
+
+
+
+
 app.listen(PORT, () => {
   console.log(`[http] listening http://localhost:${PORT}`);
   console.log(`[ui] open     http://localhost:${PORT}/index.html`);
@@ -422,7 +520,7 @@ app.listen(PORT, () => {
 
 // ===== [新增] FastAPI 代理路由 =====
 // 所有规划相关能力统一交由 FastAPI（Python）处理
-const FASTAPI_URL = process.env.FASTAPI_URL || "http://127.0.0.1:8000";
+const FASTAPI_URL = process.env.FASTAPI_URL || "http://127.0.0.1:7000";
 
 app.post("/api/generate_plan", async (req, res) => {
   try {

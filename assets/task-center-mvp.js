@@ -359,7 +359,7 @@
           style: {
             padding: "8px 16px",
             fontSize: "12px",
-            background: "#0b66ff",
+            background: "#0b66ff", // 保持原来的蓝色样式
             color: "#fff",
             border: "none",
             borderRadius: "6px",
@@ -367,10 +367,55 @@
             fontWeight: "600"
           }
         });
+        
+        // 修改按钮文字，提示这是测试
         executeBtn.textContent = "执行规划";
-        executeBtn.addEventListener("click", () => this.startExecution());
+        
+        // [核心修改] 绑定点击事件到
+        executeBtn.addEventListener("click", async () => {
+          if (!this.planData) return;
+
+          // 1. UI 反馈：防止重复点击
+          const originalText = executeBtn.textContent;
+          executeBtn.textContent = "⏳ 指令下发中...";
+          executeBtn.disabled = true;
+          executeBtn.style.opacity = "0.7";
+
+          try {
+            // 2. 发起请求：将当前的 planData 包装后发给后端
+            const response = await fetch("/api/execute_plan", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json"
+              },
+              // 注意：后端 Pydantic 模型要求结构是 { plan: { ... } }
+              body: JSON.stringify({ plan: this.planData })
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+              alert(`✅ 执行成功！\n消息: ${result.message}\n(请查看机器人是否播报)`);
+              console.log("后端返回的过滤后计划:", result.filtered_plan_preview);
+            } else {
+              alert(`❌ 执行失败: ${result.detail || "后端未知错误"}`);
+            }
+
+          } catch (error) {
+            console.error("执行请求出错:", error);
+            alert("网络请求失败，请检查后端服务");
+          } finally {
+            // 3. 恢复按钮状态
+            executeBtn.textContent = originalText;
+            executeBtn.disabled = false;
+            executeBtn.style.opacity = "1";
+          }
+        });
+
         right.appendChild(executeBtn);
       }
+
+
 
       const pauseBtn = createEl("button", "", {
         style: {

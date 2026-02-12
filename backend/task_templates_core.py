@@ -20,6 +20,8 @@ from abc import ABC, abstractmethod
 from dotenv import load_dotenv
 from openai import OpenAI
 
+from utils.location_manager import LocationManager
+
 logger = logging.getLogger(__name__)
 load_dotenv()
 
@@ -99,6 +101,29 @@ class TemplateEngine:
         self.template_specs.sort(key=lambda spec: spec.priority)
         self.template_map: Dict[str, TemplateSpec] = {spec.name: spec for spec in self.template_specs}
         self.templates: List[TaskTemplate] = [spec.handler for spec in self.template_specs if spec.handler]
+
+        # ------------------------------------------------------------------
+        # [新增] 1. 初始化 LocationManager
+        # ------------------------------------------------------------------
+        self.loc_manager = None
+        try:
+            # 自动定位 data/map_info.json 路径
+            # 假设结构:
+            # project/
+            #   ├── core/task_templates_core.py (当前文件)
+            #   └── data/map_info.json
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            project_root = os.path.dirname(current_dir) # 回退一级到 project/
+            map_path = os.path.join(project_root, "data", "map_info.json")
+            
+            if os.path.exists(map_path):
+                self.loc_manager = LocationManager(map_path)
+                logger.info(f"LocationManager 加载成功，路径: {map_path}")
+            else:
+                logger.warning(f"LocationManager 未加载: 找不到地图文件 {map_path}")
+        except Exception as e:
+            logger.error(f"LocationManager 初始化出错: {e}")
+        # ------------------------------------------------------------------
 
         try:
             api_key = os.getenv("BAIDU_API_KEY")
@@ -188,34 +213,82 @@ class TemplateEngine:
 
             if matched and template_name != "general":
                 template_spec = self._find_template_spec(template_name)
+                
                 if template_spec and template_spec.handler:
+                    # 1. 先让 Handler 生成原始的计划
+                    raw_global_planning = template_spec.handler.generate_global_planning(params)
+                    raw_tool_calls = template_spec.handler.generate_tool_calls(params)
+
+                    
+                    if self.loc_manager:
+                        logger.info(f"====== 开始解析导航点 ID (Instruction: {instruction}) ======")
+                        
+                        # 遍历所有机器人的所有动作
+                        for robot_id, actions in raw_tool_calls.items():
+                            for action in actions:
+                                args = action.get("arguments", {})
+                                act_name = action.get("action")
+
+                                # 场景 1: 找人 (search_people) -> 处理 targets 列表
+                                if act_name == "search_people":
+                                    targets = args.get("targets", [])
+                                    target_ids = []
+                                    target_id_map = {} #以此结构存入：{"张三": "ID123", "李四": "ID456"}
+
+                                    for name in targets:
+                                        # 这里的 name 即可是人名，也可是地点名（取决于你的定义）
+                                        # 假设人名 = 地点名，直接查 Map ID
+                                        mid = self.loc_manager.get_map_id(name)
+                                        if mid:
+                                            target_ids.append(mid)
+                                            target_id_map[name] = mid
+                                            # [满足需求] 打印人名对应的 ID
+                                            logger.info(f"  [search_people] 目标映射: '{name}' -> ID: {mid}")
+                                        else:
+                                            logger.warning(f"  [search_people] 未找到目标位置 ID: '{name}'")
+                                    
+                                    # [满足需求] 写入 JSON
+                                    args["target_ids"] = target_ids     # 纯 ID 列表，方便机器人直接用
+                                    args["target_details"] = target_id_map # (可选) 详细键值对，方便调试
+
+                                # 场景 2: 返回/导航 (return_to_location / navigate) -> 处理 location 字段
+                                elif act_name in ["return_to_location", "navigate", "inspect"]:
+                                    # 获取地点名称 (兼容 location 或 target 字段)
+                                    loc_name = args.get("location") or args.get("target")
+                                    
+                                    if loc_name:
+                                        # 查表获取 ID
+                                        mid = self.loc_manager.get_map_id(loc_name)
+                                        if mid:
+                                            # 1. 注入 ID 到 arguments 中
+                                            args["location_id"] = mid  
+                                            
+                                            # 2. (可选) 打印日志确认
+                                            logger.info(f"  [{act_name}] 地点映射: '{loc_name}' -> ID: {mid}")
+                                        else:
+                                            logger.warning(f"  [{act_name}] 未找到地点 ID: '{loc_name}'")
+
+                        logger.info("====== 导航点解析结束 ======")
+                    # =================================================================
+
                     return {
                         "template_name": template_name,
                         "matched": True,
                         "confidence": confidence,
                         "params": params,
-                        "llm_global_planning": template_spec.handler.generate_global_planning(params),
-                        "robot_tool_calls": template_spec.handler.generate_tool_calls(params),
+                        "llm_global_planning": raw_global_planning,
+                        "robot_tool_calls": raw_tool_calls, # 这里返回的是我们修改过（注入了ID）的字典
                         "constraints": [
                             f"匹配模板 {template_name}",
-                            "参数由 LLM 按注册表提取"
+                            "位置参数已转换为导航点 ID (已注入 target_ids/location_id)"
                         ]
                     }
-
-            return {
-                "template_name": template_name,
-                "matched": matched,
-                "confidence": confidence,
-                "params": params,
-                "llm_global_planning": [],
-                "robot_tool_calls": {},
-                "constraints": ["未命中特定模板，走通用规划"]
-            }
 
         except Exception as exc:
             logger.error("LLM 模板匹配失败: %s", exc, exc_info=True)
             return None
 
+    # ... (其余方法 _get_template_catalog_json, _find_template_spec 等保持不变) ...
     def _get_template_catalog_json(self) -> str:
         catalog = [spec.to_prompt_dict() for spec in self.template_specs]
         return json.dumps(catalog, ensure_ascii=False, indent=2)

@@ -83,6 +83,7 @@
     ],
     "notes": "离线：疑似网络未连通",
     "statusUrl": "/api/status",
+    "controlUrl": ":5002",
     "sshConfig": {
       "host": "192.168.8.34",
       "port": 22,

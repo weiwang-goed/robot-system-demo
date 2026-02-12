@@ -1,18 +1,18 @@
 {
-  "run_id": "run_1770018558162",
+  "run_id": "run_1770861214092",
   "status": "PLANNING",
   "task_type": "general",
-  "instruction": "让张三，李四来2201开会",
-  "timestamp": "2026-02-02T15:49:18.162680Z",
+  "instruction": "请王博、刘凇，到工作室开会",
+  "timestamp": "2026-02-12T09:53:34.092589Z",
   "model": "llm-template-matching",
   "template_used": "notification",
   "template_confidence": 0.95,
   "params": {
     "recipients": [
-      "张三",
-      "李四"
+      "王博",
+      "刘凇"
     ],
-    "location": "2201",
+    "location": "工作室",
     "reason": "开会"
   },
   "llm_global_planning": [
@@ -20,7 +20,7 @@
       "task_order": 0,
       "robot_id": "QR-SZZX-0001",
       "task": "通知任务",
-      "description": "通知 张三, 李四 到 2201 开会"
+      "description": "通知 王博, 刘凇 到 工作室 开会"
     }
   ],
   "robot_tool_calls": {
@@ -29,15 +29,23 @@
         "action": "search_people",
         "arguments": {
           "targets": [
-            "张三",
-            "李四"
+            "王博",
+            "刘凇"
           ],
           "stop_when_all_found": true,
           "sweep_strategy": {
             "preferred_route": [
-              "2201"
+              "工作室"
             ],
             "max_loops": 1
+          },
+          "target_ids": [
+            "15",
+            "16"
+          ],
+          "target_details": {
+            "王博": "15",
+            "刘凇": "16"
           }
         },
         "metadata": {
@@ -51,8 +59,9 @@
       {
         "action": "return_to_location",
         "arguments": {
-          "location": "2201",
-          "reason": "通知结束后返回会议室等候"
+          "location": "工作室",
+          "reason": "通知结束后返回会议室等候",
+          "location_id": "14"
         },
         "status": "pending",
         "step_id": "QR-SZZX-0001-01-return_to_location"
@@ -61,11 +70,11 @@
         "action": "speech_synthesis",
         "arguments": {
           "recipients": [
-            "张三",
-            "李四"
+            "王博",
+            "刘凇"
           ],
-          "location": "2201",
-          "message": "请张三,李四到2201开会"
+          "location": "工作室",
+          "message": "请王博,刘凇到工作室开会"
         },
         "status": "pending",
         "step_id": "QR-SZZX-0001-02-speech_synthesis"
@@ -74,7 +83,7 @@
   },
   "constraints": [
     "匹配模板 notification",
-    "参数由 LLM 按注册表提取"
+    "位置参数已转换为导航点 ID (已注入 target_ids/location_id)"
   ],
   "execution_supervision": {
     "steps": [
@@ -84,15 +93,23 @@
         "action": "search_people",
         "arguments": {
           "targets": [
-            "张三",
-            "李四"
+            "王博",
+            "刘凇"
           ],
           "stop_when_all_found": true,
           "sweep_strategy": {
             "preferred_route": [
-              "2201"
+              "工作室"
             ],
             "max_loops": 1
+          },
+          "target_ids": [
+            "15",
+            "16"
+          ],
+          "target_details": {
+            "王博": "15",
+            "刘凇": "16"
           }
         },
         "timeout_sec": 45,
@@ -109,8 +126,9 @@
         "robot_id": "QR-SZZX-0001",
         "action": "return_to_location",
         "arguments": {
-          "location": "2201",
-          "reason": "通知结束后返回会议室等候"
+          "location": "工作室",
+          "reason": "通知结束后返回会议室等候",
+          "location_id": "14"
         },
         "timeout_sec": 45,
         "retriable": true,
@@ -125,11 +143,11 @@
         "action": "speech_synthesis",
         "arguments": {
           "recipients": [
-            "张三",
-            "李四"
+            "王博",
+            "刘凇"
           ],
-          "location": "2201",
-          "message": "请张三,李四到2201开会"
+          "location": "工作室",
+          "message": "请王博,刘凇到工作室开会"
         },
         "timeout_sec": 45,
         "retriable": true,
@@ -150,13 +168,13 @@
         "step_id": "QR-SZZX-0001-00-search_people",
         "robot_id": "QR-SZZX-0001",
         "targets": [
-          "张三",
-          "李四"
+          "王博",
+          "刘凇"
         ],
         "found_targets": [],
         "stop_when_all_found": true,
         "waypoints": [
-          "2201"
+          "工作室"
         ],
         "note": "移动过程中同步感知，找到所有目标后提前终止剩余路线"
       }
@@ -170,15 +188,23 @@
         "action": "search_people",
         "arguments": {
           "targets": [
-            "张三",
-            "李四"
+            "王博",
+            "刘凇"
           ],
           "stop_when_all_found": true,
           "sweep_strategy": {
             "preferred_route": [
-              "2201"
+              "工作室"
             ],
             "max_loops": 1
+          },
+          "target_ids": [
+            "15",
+            "16"
+          ],
+          "target_details": {
+            "王博": "15",
+            "刘凇": "16"
           }
         },
         "timeout_sec": 45,
@@ -195,8 +221,9 @@
         "robot_id": "QR-SZZX-0001",
         "action": "return_to_location",
         "arguments": {
-          "location": "2201",
-          "reason": "通知结束后返回会议室等候"
+          "location": "工作室",
+          "reason": "通知结束后返回会议室等候",
+          "location_id": "14"
         },
         "timeout_sec": 45,
         "retriable": true,
@@ -211,11 +238,11 @@
         "action": "speech_synthesis",
         "arguments": {
           "recipients": [
-            "张三",
-            "李四"
+            "王博",
+            "刘凇"
           ],
-          "location": "2201",
-          "message": "请张三,李四到2201开会"
+          "location": "工作室",
+          "message": "请王博,刘凇到工作室开会"
         },
         "timeout_sec": 45,
         "retriable": true,
@@ -225,6 +252,6 @@
         "status": "pending"
       }
     ],
-    "instruction": "让张三，李四来2201开会"
+    "instruction": "请王博、刘凇，到工作室开会"
   }
 }
