@@ -5,7 +5,7 @@ import json
 import requests
 import time
 
-from face_to_user import faceMapping
+# from face_to_user import faceMapping
  
 
 
@@ -62,7 +62,7 @@ def main():
                     json_str = message_data.decode('utf-8')
                     face_id_result = json.loads(json_str)
                     
-                    face_ids = [face['face_id'] for face in face_id_result['faces']]
+                    face_names = [face['name'] for face in face_id_result['faces']]
                     
                     
                     current_time = time.time()
@@ -70,18 +70,13 @@ def main():
                     # 冷却机制
                     if current_time - last_time > COOLDOWN_SECONDS:
                         try:
-                            print(f"face_ids: {face_ids}")
+                            print(f"name: {face_names}")
 
-                            map_file = "../data/face_id_person.json"
-                            mapper = faceMapping(map_file)
+                            # map_file = "../data/face_id_person.json"
+                            # mapper = faceMapping(map_file)
+                        
                             
-                            names = []
-
-                            for i in face_ids:
-                                names.append(mapper.get_user_id(i))
-                                print(f"user_name: {names}")
-                            
-                            requests.post("http://localhost:7000/api/face_detected", params={"usernames": names})
+                            requests.post("http://localhost:7000/api/face_detected", params={"usernames": face_names})
                             
                             last_time = time.time()
 

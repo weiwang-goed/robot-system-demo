@@ -99,7 +99,11 @@ class RobotExecutor:
                     logger.error("❌ 关键运动任务失败，中断任务链")
                     break
         
+        self.cached_speech_text = None
+        self.targets = None
+        
         logger.info("✅ 运动任务流执行完毕")
+
         return plan_data
 
     # ======================================================
