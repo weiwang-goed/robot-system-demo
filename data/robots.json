@@ -68,7 +68,7 @@
     "name": "人形机器人_远征A2",
     "category": "通用机器人",
     "model": "A2_T3D1_FLAGSHIP",
-    "ip": "192.168.8.34",
+    "ip": "192.168.8.142",
     "status": "OFFLINE",
     "battery": null,
     "site": "xxx",
@@ -85,7 +85,7 @@
     "statusUrl": "/api/status",
     "controlUrl": ":5002",
     "sshConfig": {
-      "host": "192.168.8.34",
+      "host": "192.168.8.142",
       "port": 22,
       "username": "agi",
       "password": "1",

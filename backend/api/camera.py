@@ -546,7 +546,7 @@ async def video_stream(websocket):
 
 
 def start_flask():
-    app.run(host='0.0.0.0', port=7001, use_reloader=False, debug=False)
+    app.run(host='0.0.0.0', port=7005, use_reloader=False, debug=False)
 
 
 async def main():

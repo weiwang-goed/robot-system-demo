@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
 前端静态服务启动脚本
-默认 7001 端口
+默认 7005 端口
 """
 import sys
 import subprocess
 from pathlib import Path
 
-port = sys.argv[1] if len(sys.argv) > 1 else "7001"
+port = sys.argv[1] if len(sys.argv) > 1 else "7005"
 
 project_root = Path(__file__).resolve().parent
 print(f"启动前端静态服务...")

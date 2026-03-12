@@ -42,6 +42,12 @@ window.showTab = function (tabId) {
     if (taskEl) taskEl.style.display = "none";
     if (dbEl) dbEl.style.display = "none";
     if (roboCtrEl) roboCtrEl.style.display = "none";
+
+    // 设置数字孪生页面的iframe src
+    const leftIframe = document.getElementById("twin-left-iframe");
+    const rightIframe = document.getElementById("twin-right-iframe");
+    if (leftIframe) leftIframe.src = "http://192.168.8.61:38080/#/acts";
+    if (rightIframe) rightIframe.src = "http://192.168.8.61:8188/";
   }
   else {
     // show main dashboard

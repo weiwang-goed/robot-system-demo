@@ -1,16 +1,15 @@
 {
-  "run_id": "run_1770861214092",
+  "run_id": "run_1773283098047",
   "status": "PLANNING",
-  "task_type": "general",
-  "instruction": "请王博、刘凇，到工作室开会",
-  "timestamp": "2026-02-12T09:53:34.092589Z",
+  "task_type": "navigate",
+  "instruction": "找张晓飞到工作室开会",
+  "timestamp": "2026-03-12T10:38:18.047660Z",
   "model": "llm-template-matching",
   "template_used": "notification",
   "template_confidence": 0.95,
   "params": {
     "recipients": [
-      "王博",
-      "刘凇"
+      "张晓飞"
     ],
     "location": "工作室",
     "reason": "开会"
@@ -20,7 +19,7 @@
       "task_order": 0,
       "robot_id": "QR-SZZX-0001",
       "task": "通知任务",
-      "description": "通知 王博, 刘凇 到 工作室 开会"
+      "description": "通知 张晓飞 到 工作室 开会"
     }
   ],
   "robot_tool_calls": {
@@ -29,8 +28,7 @@
         "action": "search_people",
         "arguments": {
           "targets": [
-            "王博",
-            "刘凇"
+            "张晓飞"
           ],
           "stop_when_all_found": true,
           "sweep_strategy": {
@@ -40,12 +38,10 @@
             "max_loops": 1
           },
           "target_ids": [
-            "15",
             "16"
           ],
           "target_details": {
-            "王博": "15",
-            "刘凇": "16"
+            "张晓飞": "16"
           }
         },
         "metadata": {
@@ -70,11 +66,10 @@
         "action": "speech_synthesis",
         "arguments": {
           "recipients": [
-            "王博",
-            "刘凇"
+            "张晓飞"
           ],
           "location": "工作室",
-          "message": "请王博,刘凇到工作室开会"
+          "message": "请张晓飞到工作室开会"
         },
         "status": "pending",
         "step_id": "QR-SZZX-0001-02-speech_synthesis"
@@ -93,8 +88,7 @@
         "action": "search_people",
         "arguments": {
           "targets": [
-            "王博",
-            "刘凇"
+            "张晓飞"
           ],
           "stop_when_all_found": true,
           "sweep_strategy": {
@@ -104,12 +98,10 @@
             "max_loops": 1
           },
           "target_ids": [
-            "15",
             "16"
           ],
           "target_details": {
-            "王博": "15",
-            "刘凇": "16"
+            "张晓飞": "16"
           }
         },
         "timeout_sec": 45,
@@ -143,11 +135,10 @@
         "action": "speech_synthesis",
         "arguments": {
           "recipients": [
-            "王博",
-            "刘凇"
+            "张晓飞"
           ],
           "location": "工作室",
-          "message": "请王博,刘凇到工作室开会"
+          "message": "请张晓飞到工作室开会"
         },
         "timeout_sec": 45,
         "retriable": true,
@@ -168,8 +159,7 @@
         "step_id": "QR-SZZX-0001-00-search_people",
         "robot_id": "QR-SZZX-0001",
         "targets": [
-          "王博",
-          "刘凇"
+          "张晓飞"
         ],
         "found_targets": [],
         "stop_when_all_found": true,
@@ -188,8 +178,7 @@
         "action": "search_people",
         "arguments": {
           "targets": [
-            "王博",
-            "刘凇"
+            "张晓飞"
           ],
           "stop_when_all_found": true,
           "sweep_strategy": {
@@ -199,12 +188,10 @@
             "max_loops": 1
           },
           "target_ids": [
-            "15",
             "16"
           ],
           "target_details": {
-            "王博": "15",
-            "刘凇": "16"
+            "张晓飞": "16"
           }
         },
         "timeout_sec": 45,
@@ -238,11 +225,10 @@
         "action": "speech_synthesis",
         "arguments": {
           "recipients": [
-            "王博",
-            "刘凇"
+            "张晓飞"
           ],
           "location": "工作室",
-          "message": "请王博,刘凇到工作室开会"
+          "message": "请张晓飞到工作室开会"
         },
         "timeout_sec": 45,
         "retriable": true,
@@ -252,6 +238,6 @@
         "status": "pending"
       }
     ],
-    "instruction": "请王博、刘凇，到工作室开会"
+    "instruction": "找张晓飞到工作室开会"
   }
 }

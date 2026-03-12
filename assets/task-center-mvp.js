@@ -603,7 +603,7 @@
 
         try {
           // 调用后端 /api/generate_plan 接口，使用真实的 llm_planner_baidu
-          const response = await fetch("/api/generate_plan", {
+          const response = await fetch("http://localhost:7000/api/generate_plan", {
             method: "POST",
             headers: {
               "Content-Type": "application/json"

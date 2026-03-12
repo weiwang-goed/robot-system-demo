@@ -3,7 +3,7 @@
 Write-Host "=== Robot Console Dashboard (Unified Port 7000) ===" -ForegroundColor Cyan
 
 # 检查 Python
-$pythonExe = "http://localhost:7001/index.html"
+$pythonExe = "http://localhost:7005/index.html"
 if (-not (Test-Path $pythonExe)) {
     Write-Host "Virtual environment not found. Creating..." -ForegroundColor Yellow
     python -m venv .venv

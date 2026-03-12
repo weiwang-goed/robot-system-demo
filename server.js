@@ -25,7 +25,7 @@ const MQTT_PORT = process.env.MQTT_PORT || "11883";      // MQTT broker
 const MQTT_TOPIC = process.env.MQTT_TOPIC || "/Vehicle_11/vehicle_state";       // 订阅的 topic
 const CONNECT_TIMEOUT_MS = Number(process.env.CONNECT_TIMEOUT_MS || 10000);
 
-const PORT = process.env.PORT || 7001;
+const PORT = process.env.PORT || 7005;
 const OFFLINE_MS = Number(process.env.OFFLINE_MS || 30_000); // 30 秒没心跳就判离线（可调）
 
 // ===== [新增] roster 路径 + HTTP 轮询参数 =====
